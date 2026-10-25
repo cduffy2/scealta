@@ -1,0 +1,17 @@
+.DS_Store
+node_modules/
+site/dist/
+*.blend1
+
+# test renders and previews, regenerated from Blender
+renders/
+
+# Gaillimh is not cleared for redistribution yet (the font says "licensed for exclusive
+# use by Unthink"). Keep the font files and the 3D glyph outlines made from them out of
+# the public repo until Bobby Tannam confirms. See README.
+site/public/fonts/gaillimh-*
+site/public/3d/gaillimh-*.json
+
+# editor / tool leftovers
+.aider*
+*.pkg

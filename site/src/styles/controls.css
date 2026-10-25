@@ -1,0 +1,161 @@
+/* All controls: 40px tall, 1px inside stroke, Parchment fill when active. */
+
+.topbar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 10;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: var(--edge-y) var(--gutter);
+  pointer-events: none;
+}
+.topbar > * {
+  pointer-events: auto;
+}
+.topbar {
+  justify-content: space-between;
+}
+.topbar__mark {
+  color: var(--parchment);
+}
+.corner {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.corner__scroll {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--parchment);
+}
+.corner__scroll svg {
+  width: var(--icon);
+  height: var(--icon);
+}
+/* wordmark and scroll cue belong to the scenes, not the splash */
+html:not(.in-scene) .topbar__mark,
+html:not(.in-scene) .corner__scroll {
+  opacity: 0;
+  visibility: hidden;
+}
+.topbar__mark,
+.corner__scroll {
+  transition: opacity 0.6s, visibility 0.6s;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.corner {
+  position: fixed;
+  right: var(--gutter);
+  bottom: calc(var(--edge-y) + 8px);
+  z-index: 10;
+}
+
+.pill,
+.segmented {
+  /* a dark, frosted backing keeps the controls legible over bright artwork and the zooming title */
+  background-color: rgb(12 18 11 / 0.55);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.pill,
+.button,
+.segmented {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--parchment);
+}
+/* transitions only after first paint, so controls never animate into their starting state */
+.ready :is(.pill, .button, .segmented__item) {
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.pill {
+  height: var(--control-h);
+  gap: 8px;
+  padding: 0 16px;
+}
+.pill__label,
+.segmented__item span,
+.button span {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: var(--label-size);
+  line-height: 1;
+  text-box: trim-both cap alphabetic;
+}
+
+.pill[aria-pressed='true'] {
+  background: var(--parchment);
+  color: var(--peat-black);
+}
+
+.segmented {
+  height: var(--control-h);
+  padding: 4px;
+}
+.segmented__item {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: var(--label-size);
+  display: inline-flex;
+  align-items: center;
+  height: var(--segment-h);
+  padding: 0 14px;
+  border-radius: 999px;
+}
+.segmented__item[aria-pressed='true'] {
+  background: var(--parchment);
+  color: var(--peat-black);
+}
+
+.button {
+  height: 48px;
+  gap: 10px;
+  padding: 0 24px;
+}
+.button--filled {
+  background: var(--parchment);
+  color: var(--peat-black);
+}
+.button:hover {
+  background: rgb(241 233 210 / 0.12);
+}
+.button--filled:hover {
+  background: #fff8e6;
+}
+
+.pill svg,
+.button svg {
+  width: var(--icon);
+  height: var(--icon);
+  flex: none;
+}
+
+/* Mobile: sound and motion become 40px icon buttons; their labels stay for screen readers. */
+@media (max-width: 600px) {
+  .controls {
+    gap: 8px;
+  }
+  .pill {
+    width: var(--control-h);
+    padding: 0;
+  }
+  .pill__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

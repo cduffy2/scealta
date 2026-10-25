@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en" data-motion="on" data-mode="read">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The Salmon of Knowledge</title>
+    <meta name="description" content="An illustrated retelling of Bradán an Feasa, the Irish myth of the Salmon of Knowledge, in six scenes." />
+    <meta name="theme-color" content="#050A06" />
+    <link rel="preload" href="/fonts/gaillimh-black.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/gaillimh-medium.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/src/styles/main.css" />
+  </head>
+  <body>
+    <header class="topbar" aria-label="Story controls">
+      <p class="label topbar__mark" lang="ga">Bradán an Feasa</p>
+      <div class="controls">
+        <button class="pill" type="button" data-control="sound" aria-pressed="false">
+          <i data-lucide="volume-x" aria-hidden="true"></i>
+          <span class="pill__label" data-i18n="sound">Sound</span>
+        </button>
+        <div class="segmented" role="group" aria-label="Language" data-i18n-aria="language">
+          <button type="button" class="segmented__item" data-lang="ga" aria-pressed="false" lang="ga"><span>GA</span></button>
+          <button type="button" class="segmented__item" data-lang="en" aria-pressed="true" lang="en"><span>EN</span></button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="splash" id="splash" aria-labelledby="splash-title">
+        <div class="splash__rain" aria-hidden="true"></div>
+        <!-- 3D title, salmon, rain and scene 01 (src/three/), when motion is on -->
+        <div class="splash__stage" aria-hidden="true"></div>
+
+        <!-- Scene 01, seen through the counter of the title's portal letter -->
+        <div class="portal" aria-hidden="true">
+          <picture>
+            <source type="image/avif" srcset="/images/s01-960.avif 960w, /images/s01-1600.avif 1600w, /images/s01-2400.avif 2400w, /images/s01-2912.avif 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" />
+            <img class="portal__img" src="/images/s01-1600.webp" srcset="/images/s01-960.webp 960w, /images/s01-1600.webp 1600w, /images/s01-2400.webp 2400w, /images/s01-2912.webp 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" width="2912" height="1632" alt="" />
+          </picture>
+        </div>
+
+        <h1 class="splash__title" id="splash-title" data-i18n="title">The Salmon of Knowledge</h1>
+
+        <div class="splash__salmon">
+          <picture>
+            <source type="image/avif" srcset="/images/salmon-960.avif 960w, /images/salmon-1600.avif 1600w, /images/salmon-2400.avif 2400w, /images/salmon-3200.avif 3200w" sizes="(max-width: 600px) 200vw, 60vw" />
+            <img
+              src="/images/salmon-1600.webp"
+              srcset="/images/salmon-960.webp 960w, /images/salmon-1600.webp 1600w, /images/salmon-2400.webp 2400w, /images/salmon-3200.webp 3200w"
+              sizes="(max-width: 600px) 200vw, 60vw"
+              width="3904" height="1216"
+              alt="An ancient salmon drawn in fine glowing green lines, its eye a single point of vermilion."
+              data-i18n-alt="salmonAlt"
+              fetchpriority="high"
+            />
+          </picture>
+        </div>
+
+        <div class="splash__choice">
+          <div class="splash__buttons">
+            <button class="button button--filled" type="button" data-choose="listen">
+              <i data-lucide="headphones" aria-hidden="true"></i>
+              <span data-i18n="listen">Listen to the story</span>
+            </button>
+            <button class="button" type="button" data-choose="read">
+              <i data-lucide="book-open" aria-hidden="true"></i>
+              <span data-i18n="read">Read the story</span>
+            </button>
+          </div>
+          <p class="label label--muted" data-i18n="switchAnyTime">You can switch at any time</p>
+        </div>
+      </section>
+
+      <!-- Scenes arrive one at a time. Scene 01's frame is the end of the portal zoom. -->
+      <section class="scene scene--first" id="scene-01" aria-label="Scene 1, The Well" tabindex="-1">
+        <picture>
+          <source type="image/avif" srcset="/images/s01-960.avif 960w, /images/s01-1600.avif 1600w, /images/s01-2400.avif 2400w, /images/s01-2912.avif 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" />
+          <img class="scene__img" src="/images/s01-1600.webp" srcset="/images/s01-960.webp 960w, /images/s01-1600.webp 1600w, /images/s01-2400.webp 2400w, /images/s01-2912.webp 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" width="2912" height="1632" alt="Seen from above at night, a woodland pool glows beneath its surface, ringed by dark trees in the falling rain." />
+        </picture>
+        <div class="scene__scrim" aria-hidden="true" data-scene-copy></div>
+        <!-- In 3D mode this copy is moved onto the splash, over the live scene -->
+        <div class="scene__copy" data-scene-copy>
+          <h2 class="scene__title" data-i18n="s01Title">The Well</h2>
+          <p class="scene__hook" data-i18n="s01Hook">Before the world was as it is, there was a deep well of water.</p>
+          <div class="scene__rule" aria-hidden="true"></div>
+          <p class="scene__body" data-i18n="s01Body">The Well of Segais was hidden away near Carbury in County Kildare, where the rivers of Ireland were said to rise. The river Boyne came out of it first. Around the well grew nine hazel trees, and every autumn their nuts dropped into the water. Inside every nut was a share of all that was ever known.</p>
+        </div>
+        <div class="scene__progress label" data-scene-copy>
+          <span>01 / 06</span>
+          <span class="dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></span>
+        </div>
+      </section>
+    </main>
+
+    <div class="corner">
+      <span class="label corner__scroll" aria-hidden="true"><span data-i18n="scroll">Scroll</span> <i data-lucide="arrow-down"></i></span>
+      <button class="pill" type="button" data-control="motion" aria-pressed="false">
+        <i data-lucide="pause" aria-hidden="true"></i>
+        <span class="pill__label" data-i18n="pauseMotion">Pause motion</span>
+      </button>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

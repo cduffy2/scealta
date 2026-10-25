@@ -1,0 +1,80 @@
+/* Insular Modern palette, Gaillimh + BioRhyme type system (Figma: Style guide page). */
+
+/* Five static weights. The title animation steps through them like a weight axis. */
+@font-face {
+  font-family: 'Gaillimh';
+  src: url('/fonts/gaillimh-thin.woff2') format('woff2');
+  font-weight: 100;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Gaillimh';
+  src: url('/fonts/gaillimh-light.woff2') format('woff2');
+  font-weight: 300;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Gaillimh';
+  src: url('/fonts/gaillimh-bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Gaillimh';
+  src: url('/fonts/gaillimh-black.woff2') format('woff2');
+  font-weight: 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Gaillimh';
+  src: url('/fonts/gaillimh-medium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'BioRhyme';
+  src: url('/fonts/biorhyme-variable.woff2') format('woff2-variations');
+  font-weight: 200 800;
+  font-stretch: 100% 125%;
+  font-display: swap;
+}
+
+:root {
+  /* colour */
+  --peat-black: #0c120b;
+  --night: #050a06;
+  --bog: #1e3a16;
+  --bog-glow: #1a3416;
+  --hazel-leaf: #5e8a24;
+  --glow: #b9d84a;
+  --hazelnut: #c9893a;
+  --ember: #f2662a;
+  --parchment: #f1e9d2;
+  --body: #e2dac2;
+  --muted: #b3ae95;
+  --line: #33502a;
+
+  /* type */
+  --font-display: 'Gaillimh', system-ui, sans-serif;
+  --font-text: 'BioRhyme', Georgia, serif;
+  --label-size: 14px;
+
+  /* controls */
+  --control-h: 40px;
+  --segment-h: 32px;
+  --icon: 16px;
+
+  /* layout */
+  --gutter: 64px;
+  --edge-y: 38px;
+
+  /* motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (max-width: 600px) {
+  :root {
+    --gutter: 20px;
+    --edge-y: 12px;
+  }
+}
