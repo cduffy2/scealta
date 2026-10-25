@@ -18,18 +18,11 @@ npm run build      # production build in site/dist
 ### Fonts
 
 - **BioRhyme** (Aoife Mooney) is under the SIL Open Font License and is included.
-- **Gaillimh** (Bobby Tannam / Unthink, for Galway 2020) is **not** included yet. The font
-  files say they are licensed for exclusive use by Unthink, so they stay out of the repo
-  until that is confirmed. To run the site locally, install the Gaillimh `.otf` files, then:
-
-  ```bash
-  # web fonts
-  python3 -c "from fontTools.ttLib import TTFont; import os
-  for w in ['thin','light','medium','bold','black']:
-      t=TTFont(os.path.expanduser(f'~/Library/Fonts/Gaillimh-{w.title()}.otf')); t.flavor='woff2'; t.save(f'site/public/fonts/gaillimh-{w}.woff2')"
-  # 3D title glyphs
-  cd site && node scripts/fonts3d.mjs
-  ```
+- **Gaillimh** (Bobby Tannam / Unthink) is the Galway typeface, released free for all by
+  Galway Culture Company as a public cultural asset:
+  https://galwayculturecompany.ie/projects/clofhoireann-na-gaillimh-galway-printing-press-our-font/
+  The web fonts and the 3D title glyphs made from it are in `site/public/`. To regenerate the
+  glyphs after a font update: `cd site && node scripts/fonts3d.mjs`.
 
 ## Layout
 
