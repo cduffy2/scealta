@@ -1,12 +1,12 @@
 import { gsap } from 'gsap';
 
-// The splash title, built letter by letter so each one can grow through Gaillimh's
-// five weights (Thin 100 → Black 900) like a weight axis.
+// The splash title, built letter by letter so each one can grow from Gaillimh Thin
+// to Light like a weight axis.
 //
 // Source syntax (see i18n.js): "\n" breaks the line, [x] marks the portal letter whose
 // counter opens onto scene 01.
 
-const WEIGHTS = ['100', '300', '500', '700', '900'];
+const WEIGHTS = ['100', '300'];
 
 export function fontsReady() {
   return Promise.all(WEIGHTS.map((w) => document.fonts.load(`${w} 100px Gaillimh`, 'Bradán Knowledge')));
@@ -45,7 +45,7 @@ export function buildTitle(el, source) {
   return { chars, portal };
 }
 
-// Fix every letter at its Black width so the line doesn't shuffle as weights change.
+// Fix every letter at its Light width so the line doesn't shuffle as weights change.
 function lockWidths(el, chars) {
   el.classList.remove('title--locked');
   const size = parseFloat(getComputedStyle(el).fontSize);
@@ -65,7 +65,7 @@ export function animateTitle(el, chars, { onPortalLetterDone } = {}) {
     chars,
     { fontWeight: 100, autoAlpha: 0, yPercent: 10, filter: 'blur(10px)' },
     {
-      fontWeight: 900,
+      fontWeight: 300,
       autoAlpha: 1,
       yPercent: 0,
       filter: 'blur(0px)',
@@ -95,14 +95,14 @@ export function measureCounter(letter, frame) {
   const k = 4; // supersample
   const ch = letter.firstChild.textContent;
   const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
-  ctx.font = `900 ${size * k}px Gaillimh`;
+  ctx.font = `300 ${size * k}px Gaillimh`;
   const m = ctx.measureText(ch);
   const pad = 4;
   const w = Math.ceil(m.actualBoundingBoxLeft + m.actualBoundingBoxRight) + pad * 2;
   const h = Math.ceil(m.actualBoundingBoxAscent + m.actualBoundingBoxDescent) + pad * 2;
   ctx.canvas.width = w;
   ctx.canvas.height = h;
-  ctx.font = `900 ${size * k}px Gaillimh`;
+  ctx.font = `300 ${size * k}px Gaillimh`;
   const ox = pad + m.actualBoundingBoxLeft;
   const oy = pad + m.actualBoundingBoxAscent;
   ctx.fillText(ch, ox, oy);

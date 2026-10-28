@@ -9,9 +9,10 @@ import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js';
 
 const PARCHMENT = new THREE.Color('#f1e9d2');
 const GLOW = new THREE.Color('#b9d84a');
+const BOG = new THREE.Color('#1e3a16'); // the letter walls darken into the forest
 
 export function loadFonts() {
-  return new FontLoader().loadAsync('/3d/gaillimh-900.json');
+  return new FontLoader().loadAsync('/3d/gaillimh-300.json');
 }
 
 const VERT = `
@@ -20,7 +21,7 @@ const VERT = `
 // runs after the material's colour is known; may discard
 const FRAG = `
   if (uReveal < 1.0) {
-    vec2 g = vLocal.xy / (uSize * 0.035);
+    vec2 g = vLocal.xy / (uSize * 0.012); // ~5 dots across a Light stem
     vec2 cell = floor(g);
     vec2 f = fract(g) - 0.5;
     float h = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
@@ -31,8 +32,18 @@ const FRAG = `
     diffuseColor.rgb = mix(diffuseColor.rgb, uGlow * 1.25, 1.0 - smoothstep(0.55, 1.0, uReveal));
   }
 `;
+// sides only: parchment at the front edge easing into bog green over the full depth.
+// Mixed in gamma space so the fade looks even (a linear-light mix stays pale, then drops).
+const WALL = `
+  {
+    float t = smoothstep(0.0, 1.0, clamp(-vLocal.z / uBack, 0.0, 1.0));
+    vec3 a = pow(diffuseColor.rgb, vec3(1.0 / 2.2));
+    vec3 b = pow(uBog, vec3(1.0 / 2.2));
+    diffuseColor.rgb = pow(mix(a, b, t), vec3(2.2));
+  }
+`;
 
-function revealMaterial(material, uniforms) {
+function revealMaterial(material, uniforms, wall = false) {
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = `varying vec3 vLocal;\n${shader.vertexShader}`.replace(
@@ -40,9 +51,9 @@ function revealMaterial(material, uniforms) {
       `#include <begin_vertex>\n${VERT}`,
     );
     shader.fragmentShader =
-      `varying vec3 vLocal;\nuniform float uReveal, uSize;\nuniform vec3 uGlow;\n${shader.fragmentShader}`.replace(
+      `varying vec3 vLocal;\nuniform float uReveal, uSize, uBack;\nuniform vec3 uGlow, uBog;\n${shader.fragmentShader}`.replace(
         '#include <map_fragment>',
-        `#include <map_fragment>\n${FRAG}`,
+        `#include <map_fragment>\n${wall ? WALL : ''}${FRAG}`,
       );
   };
   return material;
@@ -52,7 +63,7 @@ const advance = (font, ch, size) => (font.data.glyphs[ch]?.ha ?? 0) * (size / fo
 
 /**
  * @param font    result of loadFonts()
- * @param title   { chars, portal } from title.js buildTitle (already laid out at Black)
+ * @param title   { chars, portal } from title.js buildTitle (already laid out at Light)
  * @param toWorld (x, y) in splash px -> THREE.Vector2 on the title plane
  * @param unit    world units per px on the title plane
  * @param z       z of the letters' front faces
@@ -67,10 +78,12 @@ export function buildTitle3D({ font, title, frame, toWorld, unit, z }) {
     const ch = span.firstChild.textContent;
     if (!ch.trim()) continue;
     const size = parseFloat(getComputedStyle(span).fontSize) * unit;
-    const depth = size * 0.16;
-    const bevel = { bevelEnabled: true, bevelThickness: size * 0.018, bevelSize: size * 0.01, bevelSegments: 2 };
+    // Light stems are thin (~0.063em): a shallow extrusion and a fine bevel, so the
+    // bevel doesn't fatten the strokes towards Medium
+    const depth = size * 0.12;
+    const bevel = { bevelEnabled: true, bevelThickness: size * 0.008, bevelSize: size * 0.004, bevelSegments: 2 };
     const back = depth + bevel.bevelThickness;
-    const geom = new TextGeometry(ch, { font, size, depth, curveSegments: 10, ...bevel });
+    const geom = new TextGeometry(ch, { font, size, depth, curveSegments: 24, ...bevel }); // smooth at fly-through zoom
     geom.translate(0, 0, -back); // front face at local z = 0
 
     const rect = span.getBoundingClientRect();
@@ -80,9 +93,11 @@ export function buildTitle3D({ font, title, frame, toWorld, unit, z }) {
       uReveal: { value: 1 },
       uSize: { value: size },
       uGlow: { value: GLOW },
+      uBog: { value: BOG },
+      uBack: { value: back },
     };
     const front = revealMaterial(new THREE.MeshBasicMaterial({ color: PARCHMENT }), uniforms);
-    const sides = revealMaterial(new THREE.MeshStandardMaterial({ color: PARCHMENT, roughness: 0.8, metalness: 0 }), uniforms);
+    const sides = revealMaterial(new THREE.MeshStandardMaterial({ color: PARCHMENT, roughness: 0.8, metalness: 0 }), uniforms, true);
     const mesh = new THREE.Mesh(geom, [front, sides]);
     mesh.position.set(p.x, p.y, z);
     group.add(mesh);

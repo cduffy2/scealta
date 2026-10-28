@@ -11,7 +11,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const dir = process.argv[2] ?? path.join(os.homedir(), 'Library/Fonts');
 const out = path.resolve(here, '../public/3d');
 const TEXT = 'The Salmon of Knowledge Bradán an Feasa';
-const WEIGHTS = { 900: 'Black' }; // the 3D title uses Black only
+const WEIGHTS = { 300: 'Light' }; // the 3D title uses Light only
 
 const r = (n) => Math.round(n * 10) / 10;
 
