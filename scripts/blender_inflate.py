@@ -5,26 +5,46 @@ import bpy
 import numpy as np
 
 
-def inflate(name, png, npy, px, step=3, emission=0.6, collection=None):
-    """px = world units per image pixel. Returns the new object, centred on its image."""
+def inflate(name, png, npy, px, step=3, emission=0.6, collection=None, uv_affine=None):
+    """px = world units per image pixel. Returns the new object, centred on its image.
+    uv_affine = (sx, ox, sy, oy): when the texture is framed differently from the image the
+    thickness map was made from, maps image coords (0-1, v down) to texture coords:
+    u' = sx * u + ox, v' = sy * v + oy."""
     z = np.load(npy)
     H, W = z.shape
     ys, xs = np.arange(0, H, step), np.arange(0, W, step)
     zz = z[np.ix_(ys, xs)]
     inside = zz > 0
+    # Bleed the mesh one grid cell past the silhouette (at zero thickness) so it covers
+    # the artwork's edge; the texture's alpha cuts the exact outline, not the stepped grid.
     pad = np.pad(inside, 1)
-    edge = inside & ~(pad[:-2, 1:-1] & pad[2:, 1:-1] & pad[1:-1, :-2] & pad[1:-1, 2:])
+    grown = np.zeros_like(inside)
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            grown |= pad[1 + dy:pad.shape[0] - 1 + dy, 1 + dx:pad.shape[1] - 1 + dx]
+    inside = grown
+    pad = np.pad(inside, 1)
+    # A point is on the outline if any of its 8 neighbours is outside. With only 4, a point
+    # whose outside neighbour is diagonal kept its thickness, the quad it touches was never
+    # built, and front and back were left unstitched there (holes into the mesh).
+    full = np.ones_like(inside)
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            full &= pad[1 + dy:pad.shape[0] - 1 + dy, 1 + dx:pad.shape[1] - 1 + dx]
+    edge = inside & ~full
 
+    sx, ox, sy, oy = uv_affine or (1.0, 0.0, 1.0, 0.0)
+    uv_of = lambda x, y: (sx * x / W + ox, 1 - (sy * y / H + oy))
     verts, uvs = [], []
     front = -np.ones(inside.shape, int); back = -np.ones(inside.shape, int)
     for i, j in zip(*np.nonzero(inside)):
         x, y = xs[j], ys[i]
         t = 0.0 if edge[i, j] else float(zz[i, j])
-        front[i, j] = len(verts); verts.append(((x - W / 2) * px, t * px, (H / 2 - y) * px)); uvs.append((x / W, 1 - y / H))
+        front[i, j] = len(verts); verts.append(((x - W / 2) * px, t * px, (H / 2 - y) * px)); uvs.append(uv_of(x, y))
         if edge[i, j]:
             back[i, j] = front[i, j]
         else:
-            back[i, j] = len(verts); verts.append(((x - W / 2) * px, -t * px, (H / 2 - y) * px)); uvs.append((x / W, 1 - y / H))
+            back[i, j] = len(verts); verts.append(((x - W / 2) * px, -t * px, (H / 2 - y) * px)); uvs.append(uv_of(x, y))
     faces = []
     gh, gw = inside.shape
     for i in range(gh - 1):

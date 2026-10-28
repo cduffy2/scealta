@@ -26,14 +26,20 @@ bot_raw = np.where(has_m, H - 1 - mask[::-1].argmax(0), H / 2).astype(float)
 top = ndi.gaussian_filter1d(np.maximum(top_raw, ndi.median_filter(top_raw, 801, mode="nearest")), 10)
 bot = ndi.gaussian_filter1d(np.minimum(bot_raw, ndi.median_filter(bot_raw, 401, mode="nearest")), 10)
 c, R = (top + bot) / 2, np.maximum((bot - top) / 2, 1)
-# Thickness tapers away after the narrowest point in front of the tail
+# Thickness eases away towards the narrowest point in front of the tail (the caudal
+# peduncle), so the body slims into the tail instead of ending in a blunt cap there
 search = (cols > W * 0.72) & (cols < W * 0.92) & has_m
 x1 = int(cols[search][np.argmin(R[search])])
-taper = np.where(cols > x1, np.exp(-(cols - x1) / 30.0), 1.0) * has_m
+t = np.clip((cols - (x1 - 260)) / 310.0, 0, 1)
+taper = (1 - t * t * (3 - 2 * t)) * has_m
 x0 = int(cols[has_m][0])
 Y = np.arange(H)[:, None]
 u = (Y - c[None, :]) / R[None, :]
 body_z = 0.45 * R[None, :] * np.sqrt(np.clip(1 - u ** 2, 0, 1)) * taper[None, :]
+# Round the body off at the real outline too. The smoothed top/bottom curves run outside
+# the silhouette where it dips in, which left a cliff at the edge; there the front and
+# back halves couldn't be stitched and the mesh had holes (you could see inside the fish).
+body_z = body_z * np.sqrt(np.clip(dist / 14.0, 0, 1))
 fin_z = np.minimum(dist, 2.5)
 z = np.where(mask, np.maximum(body_z, fin_z), 0).astype(np.float32)
 z = np.where(mask, ndi.gaussian_filter(z, 2), 0).astype(np.float32)

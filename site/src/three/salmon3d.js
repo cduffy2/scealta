@@ -13,6 +13,7 @@ export function gltfLoader() {
 
 // Model units (from Blender): length 3.27 along x, head at -x, height along y, thickness z.
 export const SALMON_LENGTH = 3.27;
+export const SALMON_HEIGHT = 0.99; // fin tip to fin tip
 
 // The eye in the texture (uv, measured from the upscaled cut-out; v runs downwards for glTF
 // textures), and the blink: a lid of the skin from just behind the eye (the eye sits too
@@ -37,31 +38,64 @@ const SWIM = `
   transformed.z += sin(position.x * 2.0944 - uPhase) * swimW * uAmp;
 `;
 
+// The mouth: the lower jaw swings down a little about its hinge and back, like breathing.
+// Measured on s00_salmon_complete.png (model x = (px - 829) * 0.002, y = (259 - py) * 0.002):
+// the gap between the jaws runs from the snout back to the hinge at about (150, 328), and
+// slopes down at 0.389 px per px. Below that line and in front of the hinge is the jaw.
+const MOUTH = `
+  vec2 hinge = vec2(-1.358, -0.139);
+  float below = smoothstep(0.012, -0.012, position.y - (hinge.y - 0.389 * (position.x - hinge.x)));
+  float jaw = below * smoothstep(hinge.x + 0.06, hinge.x - 0.04, position.x);
+  float ang = uMouth * 0.14 * jaw;
+  vec2 rel = transformed.xy - hinge;
+  transformed.xy = hinge + mat2(cos(ang), sin(ang), -sin(ang), cos(ang)) * rel;
+`;
+
+// The gill cover: a crescent whose front edge is attached (x ≈ 312 px) and whose free back
+// edge curves out to x ≈ 392 at its widest (y 190-375); a half-ellipse centred on the front
+// edge fits it. It lifts outwards and a little back, most at the free edge, and its lines
+// catch the light as it does. vGill carries the weight to the fragment shader.
+const GILL_VERT = `
+  vec2 gq = (position.xy - vec2(-1.034, -0.058)) / vec2(0.16, 0.196);
+  vGill = smoothstep(-0.05, 0.7, gq.x) * (1.0 - smoothstep(0.8, 1.15, dot(gq, gq)));
+  transformed.x += vGill * uGill * 0.016;
+  transformed.z += sign(position.z) * vGill * uGill * 0.03;
+`;
+const GILL_FRAG = `
+  diffuseColor.rgb *= 1.0 + vGill * uGill * 0.18;
+`;
+
 export async function loadSalmon() {
   const gltf = await gltfLoader().loadAsync('/3d/salmon.glb');
   let mesh = null;
   gltf.scene.traverse((o) => o.isMesh && (mesh = o));
-  const uniforms = { uTime: { value: 0 }, uBlink: { value: 0 }, uPhase: { value: 0 }, uAmp: { value: 0.2 } };
+  const uniforms = { uTime: { value: 0 }, uBlink: { value: 0 }, uPhase: { value: 0 }, uAmp: { value: 0.2 }, uMouth: { value: 0 }, uGill: { value: 0 } };
   const m = mesh.material;
+  // The glTF material is BLEND, which the loader also gives depthWrite: false. Without
+  // depth writes the far side (double-sided) draws over the near side in triangle order.
   m.transparent = false;
+  m.depthWrite = true;
   m.alphaTest = 0.5;
+  m.alphaToCoverage = true; // anti-aliased cut-out edge (the renderer has MSAA)
   m.emissiveMap = null; // emissive follows the (blinked) diffuse colour instead
   m.emissive = new THREE.Color(0x000000);
   m.onBeforeCompile = (shader) => {
     shader.uniforms.uPhase = uniforms.uPhase;
     shader.uniforms.uAmp = uniforms.uAmp;
     shader.uniforms.uBlink = uniforms.uBlink;
-    shader.fragmentShader = `uniform float uBlink;\n${shader.fragmentShader}`.replace(
+    shader.uniforms.uMouth = uniforms.uMouth;
+    shader.uniforms.uGill = uniforms.uGill;
+    shader.fragmentShader = `uniform float uBlink, uGill;\nvarying float vGill;\n${shader.fragmentShader}`.replace(
       '#include <map_fragment>',
-      `#include <map_fragment>\n${BLINK}`,
+      `#include <map_fragment>\n${BLINK}\n${GILL_FRAG}`,
     ).replace(
       '#include <emissivemap_fragment>',
       // the engraved lines keep their glow in the dark (and the lid glows like the skin)
       '#include <emissivemap_fragment>\n  totalEmissiveRadiance += diffuseColor.rgb * 0.6;',
     );
-    shader.vertexShader = `uniform float uPhase, uAmp;\n${shader.vertexShader}`.replace(
+    shader.vertexShader = `uniform float uPhase, uAmp, uMouth, uGill;\nvarying float vGill;\n${shader.vertexShader}`.replace(
       '#include <begin_vertex>',
-      `#include <begin_vertex>\n${SWIM}`,
+      `#include <begin_vertex>\n${MOUTH}\n${GILL_VERT}\n${SWIM}`,
     );
   };
   mesh.removeFromParent();
@@ -92,12 +126,18 @@ export function createSwim(salmon) {
   let spawn = 0;
   const GILL = new THREE.Vector3(-1.05, 0.12, 0.22); // just behind the gill cover, in front of the body (model units)
 
+  let breath = 0;
   function update(dt, speed, world) {
     pace += (speed - pace) * Math.min(1, dt * 4); // ease the tail into and out of its beat
     const freq = 0.5 + 1.5 * pace;
     phase += Math.PI * 2 * freq * dt;
     uniforms.uPhase.value = phase;
     uniforms.uAmp.value = 0.2 + 0.22 * pace;
+    // breathing: the mouth opens and closes slowly, a touch quicker while he swims
+    breath += dt * (1.9 + 1.2 * pace);
+    uniforms.uMouth.value = (0.5 - 0.5 * Math.cos(breath)) ** 1.6;
+    // the gill cover lifts a beat later, as the mouth closes: water in, then out
+    uniforms.uGill.value = (0.5 - 0.5 * Math.cos(breath - 2.2)) ** 1.6;
 
     // bubbles, in world space (they stay behind as he moves)
     spawn += dt * (0.6 + 9 * pace);
