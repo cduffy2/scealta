@@ -5,6 +5,7 @@ import { loadFonts, buildTitle3D, setLetterReveal, disposeTitle3D } from './titl
 import { loadSalmon, createSwim, SALMON_LENGTH, SALMON_HEIGHT } from './salmon3d.js';
 import { loadScene01, IMG, PLATE_DEPTH } from './scene01.js';
 import { loadScene02 } from './scene02.js';
+import { loadScene03 } from './scene03.js';
 import { createRain } from './rain3d.js';
 
 // The splash in 3D. World layout (camera never rotates, always looks down -z):
@@ -15,6 +16,7 @@ import { createRain } from './rain3d.js';
 //   z = -9 … -14               the three trees
 //   z = -30                    the painted plate (scene 01), and the pool's surface
 //   z = -33                    camera, scene 02: under the water, its layers beyond
+//   (and RISE_Y above it)      camera, scene 03: up on the river, Finegas on the bank
 //
 // The camera starts centred, flies through the counter (the letter's walls slide past,
 // lit green by the well), then settles into scene 01's frame. Until it passes the title,
@@ -25,6 +27,8 @@ import { createRain } from './rain3d.js';
 // Then the dive: scene 01's trees and bushes draw back, the camera sinks towards the pool
 // and through its surface (a wash of water green hides the crossing), and arrives in
 // scene 02. The leaves part, and the salmon, who swam off at the start, swims back in.
+// Then up: the salmon swims off, the camera rises through the water (scene 02's layers
+// drop away below) and comes up on the river, where Finegas is fishing (scene 03).
 
 const TITLE_Z = 10;
 const TITLE_DIST = 8;
@@ -39,10 +43,13 @@ const SWIM_OFF = [0.005, 0.22];
 // The whole pin, in screen heights of scroll. Scene 01 keeps its first S1 (all the
 // fractions above are of that), then the dive and scene 02 follow.
 const S1 = 3.2;
-const TOTAL = 6.4;
+const TOTAL = 9.6;
 const DIVE = [S1, 4.7];
 const FISH_IN = [4.35, 5.3];
 const TEXT2_IN = [5.0, 5.4];
+const RISE = [6.4, 8.0];
+const TEXT3_IN = [8.2, 8.6];
+const RISE_Y = 13; // how far up the river is from the camera's rest under the pool
 const END_Z = -PLATE_DEPTH - 3; // the camera's rest under the water
 const SURFACE = new THREE.Color('#2c5a1a');
 const WELL = new THREE.Color('#9cc23a');
@@ -55,7 +62,7 @@ const smoothstep = (a, b, x) => {
 };
 
 export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl, fade, onScene, onChapter }) {
-  const [font, salmon, scene01, scene02] = await Promise.all([loadFonts(), loadSalmon(), loadScene01(), loadScene02()]);
+  const [font, salmon, scene01, scene02, scene03] = await Promise.all([loadFonts(), loadSalmon(), loadScene01(), loadScene02(), loadScene03()]);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, stencil: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -65,7 +72,7 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(30, 1, 0.005, 80);
-  scene.add(scene01.group, scene02.group, salmon.group, camera);
+  scene.add(scene01.group, scene02.group, scene03.group, salmon.group, camera);
   camera.add(scene01.foreground, scene02.front); // the foregrounds travel with the camera
   scene.add(new THREE.AmbientLight(0xe8e4d4, 0.9)); // lights the letter walls (parchment lip, bog green deeper in)
   const key = new THREE.DirectionalLight(0xfff6e0, 0.9);
@@ -157,6 +164,8 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     const pool = new THREE.Vector2(hole.x + scene01.pool.x, hole.y + scene01.pool.y);
     scene02.group.position.set(pool.x, pool.y, END_Z);
     scene02.layout(t2End);
+    scene03.group.position.set(pool.x, pool.y + RISE_Y, END_Z);
+    scene03.layout({ w: (t2End * W) / H, h: t2End });
     const fp = scene02.fishPose(SALMON_LENGTH, SALMON_HEIGHT, { w: (t2End * W) / H, h: t2End });
     poses = {
       splash: {
@@ -226,14 +235,23 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     const u = pin * TOTAL; // screen heights scrolled
     const scroll = Math.min(1, u / S1); // scene 01's part of the pin
     const dive = THREE.MathUtils.clamp((u - DIVE[0]) / (DIVE[1] - DIVE[0]), 0, 1);
+    const rise = THREE.MathUtils.clamp((u - RISE[0]) / (RISE[1] - RISE[0]), 0, 1);
     const p = Math.min(1, scroll / FLIGHT); // flight progress
     // the salmon carries on his way, off to the left, as the camera moves in
     intro.exit = smoothstep(SWIM_OFF[0], SWIM_OFF[1], scroll);
     onScene?.(1, smoothstep(TEXT_IN[0], TEXT_IN[1], scroll) * (1 - smoothstep(0, 0.1, dive)));
-    onScene?.(2, smoothstep(TEXT2_IN[0], TEXT2_IN[1], u));
-    // the first dot fills on the way in, the second on the way down
-    onChapter?.(dive > 0 ? 1 + smoothstep(0, 1, (u - DIVE[0]) / (TEXT2_IN[0] - DIVE[0])) : p);
-    camera.position.copy(dive > 0 ? diveAt(dive) : cameraAt(p));
+    onScene?.(2, smoothstep(TEXT2_IN[0], TEXT2_IN[1], u) * (1 - smoothstep(0, 0.1, rise)));
+    onScene?.(3, smoothstep(TEXT3_IN[0], TEXT3_IN[1], u));
+    // the first dot fills on the way in, the second on the way down, the third on the way up
+    onChapter?.(
+      rise > 0
+        ? 2 + smoothstep(0, 1, (u - RISE[0]) / (TEXT3_IN[0] - RISE[0]))
+        : dive > 0
+          ? 1 + smoothstep(0, 1, (u - DIVE[0]) / (TEXT2_IN[0] - DIVE[0]))
+          : p,
+    );
+    if (rise > 0) camera.position.set(geo.pool.x, geo.pool.y + RISE_Y * easeIO(rise), END_Z);
+    else camera.position.copy(dive > 0 ? diveAt(dive) : cameraAt(p));
     // The scene glides from 'pool in the counter' to its final place (centred on the
     // camera's line through the counter) and is fully settled before the view opens up.
     const g = smoothstep(0.05, SPLIT * 0.9, p);
@@ -261,10 +279,16 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     scene01.group.visible = !under;
     rain.mesh.visible = z > -PLATE_DEPTH + 1;
     scene02.setBrightness(smoothstep(-PLATE_DEPTH + 1.2, -PLATE_DEPTH - 0.4, z));
-    scene02.setArrive(smoothstep(0.78, 1, dive));
-    surface.material.opacity = 1 - smoothstep(0.15, 2.4, Math.abs(z + PLATE_DEPTH));
+    // the leaves part outwards again as the camera starts up
+    scene02.setArrive(smoothstep(0.78, 1, dive) * (1 - smoothstep(0, 0.35, rise)));
+    // the water's surface: the plunge through the pool, then a lighter wash coming up
+    const up = rise > 0 ? 1 - smoothstep(0.2, 1.8, Math.abs(camera.position.y - (scene03.group.position.y + scene03.waterY()))) : 0;
+    surface.material.opacity = Math.max(1 - smoothstep(0.15, 2.4, Math.abs(z + PLATE_DEPTH)), up * 0.45);
+    scene03.group.visible = rise > 0;
+    scene03.setActive(u >= TEXT3_IN[0]); // Finegas casts now and then once you've arrived
     fish.under = dive > 0;
-    fish.k = 1.4 * (1 - easeOut(THREE.MathUtils.clamp((u - FISH_IN[0]) / (FISH_IN[1] - FISH_IN[0]), 0, 1)));
+    // in from the right, then off to the left as the camera rises
+    fish.k = 1.4 * (1 - easeOut(THREE.MathUtils.clamp((u - FISH_IN[0]) / (FISH_IN[1] - FISH_IN[0]), 0, 1))) - 1.8 * smoothstep(0, 0.5, rise);
     // the well lights the counter walls as you come close, and fades once you're past
     const near = Math.min(1, p / SPLIT);
     const peak = (geo.size * 0.6) ** 2 * 0.7; // scales with the letter size so the glow looks the same on every screen
@@ -324,6 +348,7 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     placeSalmon(dt);
     scene01.tick(dt);
     scene02.tick(dt);
+    if (scene03.group.visible) scene03.tick(dt);
     rain.update(dt);
     renderer.render(scene, camera);
   }

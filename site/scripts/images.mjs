@@ -15,6 +15,8 @@ const jobs = [
   ['s01', 'source/s01_well_up.png', [960, 1600, 2400, 2912]],
   ['s01-calm', 'cutouts/s01_calm.png', [1600, 2912]], // pool without its painted ripples
   ['s02', 'source/s02_fintan_up.png', [960, 1600, 2400, 2912]], // flat scene 02 (2D fallback)
+  ['s03', 'source/s03_finegas_up.png', [960, 1600, 2400, 2912]], // flat scene 03 (2D fallback)
+  ['s03-norod', 'cutouts/s03_no-rod.png', [1600, 2912]], // scene 03 for 3D: rod and line drawn live
 ];
 
 await mkdir(out, { recursive: true });
@@ -71,3 +73,12 @@ for (const nut of meta.s02.nuts) {
   manifest.nuts.push({ name, cx: b.x + b.w / 2, cy: b.y + b.h / 2, w: b.w, h: b.h });
 }
 await writeFile(path.resolve(here, '../src/three/s02-layers.json'), JSON.stringify(manifest, null, 2) + '\n');
+
+// Scene 03's Finegas, in layers (scripts/s03_finegas.py): his upper body and arm move to cast.
+const s03Out = path.join(out, 's03');
+await mkdir(s03Out, { recursive: true });
+await sharp(path.join(assets, 'cutouts/s03_water.png')).webp({ quality: 85 }).toFile(path.join(s03Out, 'water.webp')); // where the river moves
+for (const name of ['torso', 'arm']) {
+  await sharp(path.join(assets, `cutouts/s03_${name}.png`)).webp({ quality: 90, alphaQuality: 95 }).toFile(path.join(s03Out, `${name}.webp`));
+}
+await writeFile(path.resolve(here, '../src/three/s03-finegas.json'), await readFile(path.join(assets, 'cutouts/s03_finegas.json'), 'utf8'));

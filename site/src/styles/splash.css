@@ -221,6 +221,10 @@
   .scene__copy[data-scene-copy='2'] {
     top: 34svh;
   }
+  /* scene 03's painting fills the top 45% (Figma: Mobile 03) */
+  .scene__copy[data-scene-copy='3'] {
+    top: 44svh;
+  }
   .scene__title {
     font-size: 48px;
   }

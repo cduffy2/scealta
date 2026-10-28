@@ -20,6 +20,9 @@ export const strings = {
     s02Title: 'The First Man',
     s02Hook: 'He had been alive since before the flood.',
     s02Body: 'Fintan mac Bóchra came to Ireland with the first people ever to set foot on the island. After the great flood rose, Fintan was the only one to live. He survived by changing his shape first into an eagle, then a hawk, and in the end a salmon. Up to the well he swam, and there he ate nine nuts, one from every tree. With the ninth, he had the knowledge of the world inside him, and away down the Boyne he went.',
+    s03Title: 'The Poet',
+    s03Hook: 'It was said that anyone who ate this salmon would gain all the wisdom of the world.',
+    s03Body: 'Finegas, a druid-poet, had given his life to that prophecy. He built a house on the bank of the Boyne and fished every morning. A boy named Fionn came to study with him, hiding from the men who had killed his father.',
   },
   ga: {
     title: 'Bra[d]án\nan Feasa',
@@ -40,6 +43,9 @@ export const strings = {
     s02Title: 'An Chéad Fhear',
     s02Hook: 'He had been alive since before the flood.',
     s02Body: 'Fintan mac Bóchra came to Ireland with the first people ever to set foot on the island. After the great flood rose, Fintan was the only one to live. He survived by changing his shape first into an eagle, then a hawk, and in the end a salmon. Up to the well he swam, and there he ate nine nuts, one from every tree. With the ninth, he had the knowledge of the world inside him, and away down the Boyne he went.',
+    s03Title: 'An File',
+    s03Hook: 'It was said that anyone who ate this salmon would gain all the wisdom of the world.',
+    s03Body: 'Finegas, a druid-poet, had given his life to that prophecy. He built a house on the bank of the Boyne and fished every morning. A boy named Fionn came to study with him, hiding from the men who had killed his father.',
   },
 };
 
