@@ -19,6 +19,43 @@
 .topbar__mark {
   color: var(--parchment);
 }
+/* Scéalta › story. Scéalta becomes a link once the site has a home page. */
+.crumbs {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.crumbs li {
+  display: inline-flex;
+  align-items: center;
+}
+.crumbs__site {
+  color: var(--muted);
+}
+/* on narrow screens the story name gives way to the controls */
+.topbar__mark,
+.crumbs,
+.crumbs li:last-child {
+  min-width: 0;
+}
+.crumbs li:last-child span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-block: 0.2em; /* room for fadas and descenders inside the clip */
+  margin-block: -0.2em;
+}
+.topbar__mark {
+  margin-right: 16px;
+}
+.crumbs svg {
+  width: 14px;
+  height: 14px;
+  margin: 0 6px;
+  color: var(--muted);
+}
 .corner {
   display: flex;
   align-items: center;

@@ -30,9 +30,10 @@ export const imageToWorld = (px, py, d) => ({
 });
 
 export async function loadScene01() {
-  const [gltf, plateTex] = await Promise.all([
+  const [gltf, plateTex, nutTex] = await Promise.all([
     gltfLoader().loadAsync('/3d/s01-layers.glb'),
     new THREE.TextureLoader().loadAsync('/images/s01-calm-2912.webp'),
+    new THREE.TextureLoader().loadAsync('/images/s02/s02_hazelnut_01.webp'),
   ]);
   const group = new THREE.Group();
   const materials = []; // [material, base brightness]
@@ -56,9 +57,10 @@ export async function loadScene01() {
     colors.push(k, k, k);
   }
   geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  const plateMat = new THREE.MeshBasicMaterial({ map: plateTex, vertexColors: true });
+  const plateMat = new THREE.MeshBasicMaterial({ map: plateTex, vertexColors: true, transparent: true });
   const plate = new THREE.Mesh(geom, plateMat);
   plate.position.z = -PLATE_DEPTH;
+  plate.renderOrder = -1; // transparent (for the fade), so pin it first: always behind the rings
   group.add(plate);
   materials.push([plateMat, 1]);
 
@@ -68,7 +70,7 @@ export async function loadScene01() {
     const old = o.material;
     old.map.colorSpace = THREE.SRGBColorSpace;
     // unlit, so the colours match the painting
-    const mat = new THREE.MeshBasicMaterial({ map: old.map, alphaTest: 0.5, side: THREE.DoubleSide });
+    const mat = new THREE.MeshBasicMaterial({ map: old.map, alphaTest: 0.5, side: THREE.DoubleSide, transparent: true });
     old.dispose();
     o.material = mat;
     materials.push([mat, LAYER_TINT]);
@@ -100,6 +102,9 @@ export async function loadScene01() {
       slide: Math.sign(x) * (d * 0.5 - Math.abs(x) + w * 0.6), // trees: from just outside their edge
       tree,
       seed: layers.length * 1.7,
+      d,
+      w,
+      h,
     });
   }
   // bushes first, then the trees
@@ -128,11 +133,11 @@ export async function loadScene01() {
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
-    uniforms: { uTime: { value: 0 }, uBright: { value: 0 }, uColor: { value: new THREE.Color('#d8f080') } },
+    uniforms: { uTime: { value: 0 }, uBright: { value: 0 }, uFade: { value: 1 }, uColor: { value: new THREE.Color('#d8f080') } },
     vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     fragmentShader: `
       varying vec2 vUv;
-      uniform float uTime, uBright;
+      uniform float uTime, uBright, uFade;
       uniform vec3 uColor;
       void main() {
         // pool centre and radii in the painting (v up), rings are wide flat ellipses
@@ -153,13 +158,116 @@ export async function loadScene01() {
         float fade = (1.0 - smoothstep(0.75, 1.15, r)) * smoothstep(0.0, 0.08, r);
         float band = line * pulse * fade;
         float rings = 1.0;
-        gl_FragColor = vec4(uColor * band * 0.85 * uBright, 1.0);
+        // additive: the colour is weighted by alpha, and alpha must fall to 0 too, or the
+        // rings' plane paints opaque black over the page while the scene is hidden
+        gl_FragColor = vec4(uColor, band * 0.85 * uBright * uFade);
       }`,
   });
   const ripple = new THREE.Mesh(new THREE.PlaneGeometry(w, (w * IMG.h) / IMG.w), ripples);
-  ripple.position.z = -PLATE_DEPTH + 0.02;
+  // clear of the plate by a few depth-buffer steps (near is 0.005, so precision is coarse
+  // out here), and drawn after the plate and the layers so the bushes still cover it
+  ripple.position.z = -PLATE_DEPTH + 0.1;
+  ripple.renderOrder = 1;
   group.add(ripple);
   materials.push([ripples, null]);
+
+  // Now and then a hazelnut drops from one of the two near trees into the pool. It falls
+  // in the trees' layer, from inside the crown on the side nearest the pool, to the spot on
+  // screen where the pool lies beneath it; a small ring then spreads on the water there
+  // (the same point on the plate, along the camera's line of sight). Only while resting on
+  // scene 01 (camera at its end point: foreground and plate are both camera-centred then).
+  nutTex.colorSpace = THREE.SRGBColorSpace;
+  const nutMat = new THREE.MeshBasicMaterial({ map: nutTex, transparent: true, alphaTest: 0.4, depthWrite: false });
+  materials.push([nutMat, 0.85]);
+  const nut = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), nutMat);
+  nut.visible = false;
+  foreground.add(nut);
+  const splashMat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: { uAge: { value: 1 }, uBright: { value: 0 }, uColor: { value: new THREE.Color('#d8f080') } },
+    vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `
+      varying vec2 vUv;
+      uniform float uAge, uBright;
+      uniform vec3 uColor;
+      void main() {
+        float r = length((vUv - 0.5) * 2.0);
+        // two thin rings, the second a moment behind the first, growing and fading out
+        float a = 0.0;
+        for (int i = 0; i < 2; i++) {
+          float t = clamp(uAge - float(i) * 0.18, 0.0, 1.0);
+          float rad = 0.12 + 0.85 * (1.0 - pow(1.0 - t, 2.0));
+          float aa = fwidth(r) * 1.5;
+          a += (1.0 - smoothstep(0.035, 0.035 + aa, abs(r - rad))) * (1.0 - t) * step(0.001, t);
+        }
+        gl_FragColor = vec4(uColor, a * 0.55 * uBright);
+      }`,
+  });
+  materials.push([splashMat, null]);
+  // flat on the water like the pool's own rings (they're 0.34 x 0.125 of the frame)
+  const splash = new THREE.Mesh(new THREE.PlaneGeometry(1.5, (1.5 * 0.125 * IMG.h) / (0.34 * IMG.w)), splashMat);
+  splash.position.z = -PLATE_DEPTH + 0.12;
+  splash.renderOrder = 2;
+  splash.visible = false;
+  group.add(splash);
+
+  const trees = layers.filter((l) => l.tree);
+  const POOL = { u: 0.505, v: 0.22, ru: 0.34, rv: 0.125 }; // the rings' ellipse on the plate (v up)
+  const plateH = (w * IMG.h) / IMG.w;
+  let fall = null; // { t, T, x0, y0, y1, plate: {x, y}, spin }
+  let splashAge = 1;
+  let wait = 4;
+  let dropping = false;
+  function dropNut() {
+    const tree = trees[Math.floor(Math.random() * trees.length)];
+    const d = tree.d + 0.25; // just behind the crown's front, so it emerges from the leaves
+    const inward = -Math.sign(tree.baseX);
+    // a column at the crown's inner edge (the part that hangs over the pool), at the nut's
+    // depth: it slips out from the leaves there and is seen all the way down
+    const x = ((tree.baseX + inward * tree.w * (0.46 + Math.random() * 0.08)) * d) / tree.d;
+    const u = 0.5 + x / d; // where that column meets the plate, as a fraction of its width
+    const du = (u - POOL.u) / POOL.ru;
+    if (Math.abs(du) > 0.96) return; // that column misses the water
+    const v = POOL.v + (Math.random() - 0.2) * POOL.rv * Math.sqrt(1 - du * du) * 0.7;
+    const py = (v - 0.5) * plateH;
+    const y1 = (py * d) / PLATE_DEPTH;
+    const y0 = ((tree.baseY + tree.h * (0.5 + Math.random() * 0.15)) * d) / tree.d;
+    if (y0 <= y1) return;
+    const size = 0.075 * (d / 8);
+    nut.scale.set(size, size, 1);
+    fall = { t: 0, T: 1.1 + 0.3 * Math.sqrt((y0 - y1) / d), x0: x, y0, y1, d, plate: { x: (x * PLATE_DEPTH) / d, y: py }, spin: (Math.random() - 0.5) * 6 };
+  }
+  function nuts(dt) {
+    if (fall) {
+      fall.t += dt;
+      const k = Math.min(1, fall.t / fall.T);
+      nut.visible = true;
+      nut.position.set(fall.x0 + Math.sin(k * 5) * 0.012 * fall.d, fall.y0 + (fall.y1 - fall.y0) * k * k, -fall.d);
+      nut.rotation.z = fall.spin * k;
+      nutMat.opacity = Math.min(1, fall.t / 0.15);
+      if (k >= 1) {
+        nut.visible = false;
+        splash.position.x = fall.plate.x;
+        splash.position.y = fall.plate.y;
+        splashAge = 0;
+        fall = null;
+      }
+    } else if (dropping && (wait -= dt) <= 0) {
+      wait = 6 + Math.random() * 6;
+      dropNut();
+    }
+    if (splashAge < 1) splashAge = Math.min(1, splashAge + dt / 2.6);
+    splash.visible = splashAge < 1;
+    splashMat.uniforms.uAge.value = splashAge;
+  }
+  if (import.meta.env.DEV) window.__nuts = () => ({ fall, wait, dropping, splashAge, nut: nut.position.toArray().map((v) => +v.toFixed(2)) });
+  // on only while resting on scene 01; a nut already falling finishes its fall
+  const setNuts = (on) => {
+    if (on && !dropping) wait = 2 + Math.random() * 3;
+    dropping = on;
+  };
 
   // seen only through the portal letter until the camera passes the title
   function setMasked(masked) {
@@ -172,14 +280,21 @@ export async function loadScene01() {
   }
   setMasked(true);
 
-  // brightness 0 (black) -> 1: the scene fades up from black as you scroll towards it
+  // brightness 0 -> 1: the scene fades up from dark as you scroll towards it. At 0 it is
+  // fully transparent, so the counter shows the page behind it like every other letter.
   function setBrightness(k) {
     for (const [m, base] of materials) {
       if (base === null) m.uniforms.uBright.value = k;
-      else m.color.setScalar(k * base);
+      else if (m === nutMat) m.color.setScalar(k * base);
+      else {
+        m.color.setScalar(k * base);
+        m.opacity = Math.min(1, k * 2);
+      }
     }
   }
   setBrightness(0);
-  const tick = (dt) => ((ripples.uniforms.uTime.value += dt), sway(dt));
-  return { group, foreground, setRise, setMasked, setBrightness, tick, pool: imageToWorld(0.505 * IMG.w, 0.78 * IMG.h, PLATE_DEPTH) };
+  // 1 -> 0: the rings fade as the camera sinks towards the pool (they'd fill the view)
+  const setRippleFade = (k) => (ripples.uniforms.uFade.value = k);
+  const tick = (dt) => ((ripples.uniforms.uTime.value += dt), sway(dt), nuts(dt));
+  return { group, foreground, setRise, setMasked, setBrightness, setRippleFade, setNuts, tick, pool: imageToWorld(0.505 * IMG.w, 0.78 * IMG.h, PLATE_DEPTH) };
 }

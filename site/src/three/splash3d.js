@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { loadFonts, buildTitle3D, setLetterReveal, disposeTitle3D } from './title3d.js';
-import { loadSalmon, createSwim, SALMON_LENGTH } from './salmon3d.js';
+import { loadSalmon, createSwim, SALMON_LENGTH, SALMON_HEIGHT } from './salmon3d.js';
 import { loadScene01, IMG, PLATE_DEPTH } from './scene01.js';
+import { loadScene02 } from './scene02.js';
 import { createRain } from './rain3d.js';
 
 // The splash in 3D. World layout (camera never rotates, always looks down -z):
@@ -12,13 +13,18 @@ import { createRain } from './rain3d.js';
 //   z = TITLE_Z                front faces of the extruded title
 //   z = 0                      camera end: scene 01 framed exactly like its flat image
 //   z = -9 … -14               the three trees
-//   z = -30                    the painted plate
+//   z = -30                    the painted plate (scene 01), and the pool's surface
+//   z = -33                    camera, scene 02: under the water, its layers beyond
 //
 // The camera starts centred, flies through the counter (the letter's walls slide past,
 // lit green by the well), then settles into scene 01's frame. Until it passes the title,
 // scene 01 is only drawn where a stencil mask in the counter allows, and it starts
 // shifted so the pool sits in the counter, gliding into its real place on the approach.
 // Keeping the camera near the axis means the painting always fills the widening view.
+//
+// Then the dive: scene 01's trees and bushes draw back, the camera sinks towards the pool
+// and through its surface (a wash of water green hides the crossing), and arrives in
+// scene 02. The leaves part, and the salmon, who swam off at the start, swims back in.
 
 const TITLE_Z = 10;
 const TITLE_DIST = 8;
@@ -28,17 +34,28 @@ const SPLIT = 0.55; // share of the flight spent approaching the title
 // the start), then scene 01's text comes in and holds before the page moves on.
 const FLIGHT = 0.68;
 const TEXT_IN = [0.72, 0.84];
+const LANDED = TEXT_IN[1] + 0.02; // scene 01 fully in: where the Listen / Read buttons land
 const SWIM_OFF = [0.005, 0.22];
+// The whole pin, in screen heights of scroll. Scene 01 keeps its first S1 (all the
+// fractions above are of that), then the dive and scene 02 follow.
+const S1 = 3.2;
+const TOTAL = 6.4;
+const DIVE = [S1, 4.7];
+const FISH_IN = [4.35, 5.3];
+const TEXT2_IN = [5.0, 5.4];
+const END_Z = -PLATE_DEPTH - 3; // the camera's rest under the water
+const SURFACE = new THREE.Color('#2c5a1a');
 const WELL = new THREE.Color('#9cc23a');
 
 const easeIO = gsap.parseEase('power2.inOut');
+const easeOut = gsap.parseEase('power2.out');
 const smoothstep = (a, b, x) => {
   const t = THREE.MathUtils.clamp((x - a) / (b - a), 0, 1);
   return t * t * (3 - 2 * t);
 };
 
-export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl, fade, onScene }) {
-  const [font, salmon, scene01] = await Promise.all([loadFonts(), loadSalmon(), loadScene01()]);
+export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl, fade, onScene, onChapter }) {
+  const [font, salmon, scene01, scene02] = await Promise.all([loadFonts(), loadSalmon(), loadScene01(), loadScene02()]);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, stencil: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -48,9 +65,9 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(30, 1, 0.005, 80);
-  scene.add(scene01.group, salmon.group, camera);
-  camera.add(scene01.foreground); // the foreground travels with the camera
-  scene.add(new THREE.AmbientLight(0xe8e4d4, 0.9)); // letter sides read as solid parchment, a shade darker than the faces
+  scene.add(scene01.group, scene02.group, salmon.group, camera);
+  camera.add(scene01.foreground, scene02.front); // the foregrounds travel with the camera
+  scene.add(new THREE.AmbientLight(0xe8e4d4, 0.9)); // lights the letter walls (parchment lip, bog green deeper in)
   const key = new THREE.DirectionalLight(0xfff6e0, 0.9);
   key.position.set(-4, 6, 10);
   scene.add(key);
@@ -60,6 +77,14 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
   scene.add(swim.bubbles);
   const rain = createRain(window.innerWidth < 600 ? 220 : 420);
   scene.add(rain.mesh);
+  // the pool's surface as the camera goes through: a wash of water over the whole view
+  const surface = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({ color: SURFACE, transparent: true, opacity: 0, depthTest: false, depthWrite: false }),
+  );
+  surface.position.z = -0.05;
+  surface.renderOrder = 999;
+  camera.add(surface);
 
   const maskMat = new THREE.MeshBasicMaterial({
     colorWrite: false,
@@ -75,6 +100,8 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
   let geo = null; // layout-dependent numbers
   let progress = 0;
   const intro = { salmon: 0, exit: 0, letters: null }; // salmon offset (in view widths), per-letter progress
+  const fish = { under: false, k: 0 }; // under: he's in scene 02, k: view widths right of his place there
+  let poses = null; // the salmon's place on the splash and in scene 02
   let trigger = null;
 
   // ---- layout ----------------------------------------------------------------
@@ -126,9 +153,19 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     const su = (sd * t2) / H;
     const cx = sr.left - fr.left + sr.width / 2;
     const cy = sr.top - fr.top + sr.height / 2;
-    salmon.rest = new THREE.Vector3(start.x + (cx - W / 2) * su, start.y + (H / 2 - cy) * su, TITLE_Z + 0.4);
-    salmon.group.position.copy(salmon.rest);
-    salmon.group.scale.setScalar((sr.width * su) / SALMON_LENGTH);
+    // scene 02 sits around the camera's rest under the pool
+    const pool = new THREE.Vector2(hole.x + scene01.pool.x, hole.y + scene01.pool.y);
+    scene02.group.position.set(pool.x, pool.y, END_Z);
+    scene02.layout(t2End);
+    const fp = scene02.fishPose(SALMON_LENGTH, SALMON_HEIGHT, { w: (t2End * W) / H, h: t2End });
+    poses = {
+      splash: {
+        rest: new THREE.Vector3(start.x + (cx - W / 2) * su, start.y + (H / 2 - cy) * su, TITLE_Z + 0.4),
+        scale: (sr.width * su) / SALMON_LENGTH,
+        viewW: W * su,
+      },
+      under: { rest: new THREE.Vector3(pool.x + fp.x, pool.y + fp.y, END_Z + fp.z), scale: fp.scale, viewW: fp.viewW },
+    };
 
     well.position.set(hole.x, hole.y, TITLE_Z - title.letters[0].size * 0.2);
     well.distance = title.letters[0].size * 3;
@@ -143,7 +180,7 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     });
 
     intro.letters?.forEach((t, i) => title.letters[i] && setLetterReveal(title.letters[i], t));
-    geo = { start, hole, sceneShift, size: title.letters[0].size, viewW: W * su, t2At };
+    geo = { start, hole, sceneShift, pool, size: title.letters[0].size, t2At, t2End };
     setProgress(progress);
   }
 
@@ -172,14 +209,31 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     return pos;
   }
 
-  function setProgress(scroll) {
-    progress = scroll;
+  // the dive (d 0 -> 1): down towards the pool, through its surface, on to the rest below
+  function diveAt(d) {
+    const { hole, pool } = geo;
+    const g = smoothstep(0, 0.75, d);
+    return new THREE.Vector3(
+      THREE.MathUtils.lerp(hole.x, pool.x, g),
+      THREE.MathUtils.lerp(hole.y, pool.y, g),
+      END_Z * easeIO(d),
+    );
+  }
+
+  function setProgress(pin) {
+    progress = pin;
     if (!geo) return;
+    const u = pin * TOTAL; // screen heights scrolled
+    const scroll = Math.min(1, u / S1); // scene 01's part of the pin
+    const dive = THREE.MathUtils.clamp((u - DIVE[0]) / (DIVE[1] - DIVE[0]), 0, 1);
     const p = Math.min(1, scroll / FLIGHT); // flight progress
     // the salmon carries on his way, off to the left, as the camera moves in
     intro.exit = smoothstep(SWIM_OFF[0], SWIM_OFF[1], scroll);
-    onScene?.(smoothstep(TEXT_IN[0], TEXT_IN[1], scroll));
-    camera.position.copy(cameraAt(p));
+    onScene?.(1, smoothstep(TEXT_IN[0], TEXT_IN[1], scroll) * (1 - smoothstep(0, 0.1, dive)));
+    onScene?.(2, smoothstep(TEXT2_IN[0], TEXT2_IN[1], u));
+    // the first dot fills on the way in, the second on the way down
+    onChapter?.(dive > 0 ? 1 + smoothstep(0, 1, (u - DIVE[0]) / (TEXT2_IN[0] - DIVE[0])) : p);
+    camera.position.copy(dive > 0 ? diveAt(dive) : cameraAt(p));
     // The scene glides from 'pool in the counter' to its final place (centred on the
     // camera's line through the counter) and is fully settled before the view opens up.
     const g = smoothstep(0.05, SPLIT * 0.9, p);
@@ -188,16 +242,29 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
       THREE.MathUtils.lerp(geo.sceneShift.y, geo.hole.y, g),
       0,
     );
-    const t2 = geo.t2At(camera.position.z);
+    const t2 = camera.position.z <= 0 ? geo.t2End : geo.t2At(camera.position.z);
     camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(t2 / 2));
     camera.updateProjectionMatrix();
     // keep the foreground the same size on screen while the field of view narrows
     scene01.foreground.scale.setScalar(t2 / geo.t2At(0));
-    scene01.setRise(smoothstep(SPLIT + 0.04, 0.97, p));
+    // trees and bushes come in at the end of the flight, and draw back as the dive begins
+    scene01.setRise(dive > 0 ? 1 - smoothstep(0, 0.4, dive) : smoothstep(SPLIT + 0.04, 0.97, p));
     const through = camera.position.z < TITLE_Z;
     scene01.setMasked(!through);
-    scene01.setBrightness(smoothstep(0.04, SPLIT * 0.8, p)); // black at rest, fades up as you scroll in
+    scene01.setBrightness(smoothstep(0.04, SPLIT * 0.8, p)); // hidden at rest, fades up as you scroll in
+    scene01.setRippleFade(1 - 0.85 * smoothstep(0.2, 0.75, dive)); // calm before the plunge
+    scene01.setNuts(p >= 0.99 && dive === 0); // hazelnuts drop now and then while you rest on scene 01
     mask.visible = !through;
+    // through the surface: scene 01 is behind now, scene 02 opens up around the camera
+    const z = camera.position.z;
+    const under = z < -PLATE_DEPTH;
+    scene01.group.visible = !under;
+    rain.mesh.visible = z > -PLATE_DEPTH + 1;
+    scene02.setBrightness(smoothstep(-PLATE_DEPTH + 1.2, -PLATE_DEPTH - 0.4, z));
+    scene02.setArrive(smoothstep(0.78, 1, dive));
+    surface.material.opacity = 1 - smoothstep(0.15, 2.4, Math.abs(z + PLATE_DEPTH));
+    fish.under = dive > 0;
+    fish.k = 1.4 * (1 - easeOut(THREE.MathUtils.clamp((u - FISH_IN[0]) / (FISH_IN[1] - FISH_IN[0]), 0, 1)));
     // the well lights the counter walls as you come close, and fades once you're past
     const near = Math.min(1, p / SPLIT);
     const peak = (geo.size * 0.6) ** 2 * 0.7; // scales with the letter size so the glow looks the same on every screen
@@ -236,14 +303,17 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
   let lastK = intro.salmon;
   let speed = 0;
   function placeSalmon(dt) {
-    const k = intro.salmon - intro.exit * 1.4; // + right of rest (swimming in), - off to the left
+    // on the splash: swimming in, then off to the left. Under the pool: swimming back in.
+    const pose = fish.under ? poses.under : poses.splash;
+    const k = fish.under ? fish.k : intro.salmon - intro.exit * 1.4; // + right of rest, - left
     const v = dt > 0 ? Math.abs(k - lastK) / dt : 0;
     lastK = k;
     speed += (Math.min(1, v / 0.55) - speed) * Math.min(1, dt * 6);
     const g = salmon.group;
+    g.scale.setScalar(pose.scale);
     const o = swim.update(dt, speed, g.matrixWorld);
-    const len = SALMON_LENGTH * g.scale.x;
-    g.position.set(salmon.rest.x + k * geo.viewW + o.surge * len, salmon.rest.y + o.bob * len, salmon.rest.z);
+    const len = SALMON_LENGTH * pose.scale;
+    g.position.set(pose.rest.x + k * pose.viewW + o.surge * len, pose.rest.y + o.bob * len, pose.rest.z);
     g.rotation.y = o.yaw;
   }
 
@@ -253,6 +323,7 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     blink(dt);
     placeSalmon(dt);
     scene01.tick(dt);
+    scene02.tick(dt);
     rain.update(dt);
     renderer.render(scene, camera);
   }
@@ -310,7 +381,7 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
       trigger = ScrollTrigger.create({
         trigger: splash,
         start: 'top top',
-        end: '+=320%',
+        end: `+=${TOTAL * 100}%`,
         pin: true,
         scrub: 0.6,
         onUpdate: (self) => setProgress(self.progress),
@@ -320,7 +391,7 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     // jump to where scene 01 is fully in (the Listen / Read buttons)
     goToScene(behavior = 'smooth') {
       if (!trigger) return;
-      window.scrollTo({ top: trigger.start + (trigger.end - trigger.start) * (TEXT_IN[1] + 0.02), behavior });
+      window.scrollTo({ top: trigger.start + (trigger.end - trigger.start) * ((LANDED * S1) / TOTAL), behavior });
     },
     destroy() {
       trigger?.kill(true);

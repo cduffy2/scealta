@@ -15,7 +15,7 @@ const IMG = { w: 2912, h: 1632 };
 
 const smooth = gsap.parseEase('power2.inOut');
 
-export function createPortal({ splash, title, letter, portal, image, fade }) {
+export function createPortal({ splash, title, letter, portal, image, fade, onChapter }) {
   let geo = null;
   let trigger = null;
 
@@ -38,6 +38,7 @@ export function createPortal({ splash, title, letter, portal, image, fade }) {
   }
 
   function render(p) {
+    onChapter?.(p);
     if (!geo) return;
     const { hole, rx, ry, P, S, origin, W, H } = geo;
     const s = S ** p; // exponential: reads as a steady push of the camera

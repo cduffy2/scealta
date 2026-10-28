@@ -1,14 +1,15 @@
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { createIcons, VolumeX, Volume2, Headphones, BookOpen, Pause, Play, ArrowDown } from 'lucide';
+import { createIcons, VolumeX, Volume2, Headphones, BookOpen, Pause, Play, ArrowDown, ChevronRight } from 'lucide';
 import { state, save } from './state.js';
 import { strings, applyStrings } from './i18n.js';
 import { buildTitle, fontsReady, animateTitle, showTitle } from './title.js';
 import { createPortal } from './portal.js';
+import { createProgress } from './progress.js';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const icons = { VolumeX, Volume2, Headphones, BookOpen, Pause, Play, ArrowDown };
+const icons = { VolumeX, Volume2, Headphones, BookOpen, Pause, Play, ArrowDown, ChevronRight };
 const root = document.documentElement;
 const soundBtn = document.querySelector('[data-control="sound"]');
 const motionBtn = document.querySelector('[data-control="motion"]');
@@ -20,6 +21,46 @@ let title = null; // { chars, portal } for the current language
 let portal = null; // 2D zoom (fallback)
 let splash3d = null; // 3D title, salmon and fly-through
 let introTl = null;
+const progress = createProgress(document.querySelector('.progress'));
+
+// With motion off there is no zoom to report progress, so the plain scroll does.
+let plainProgress = null;
+function trackPlainScroll(on) {
+  plainProgress?.kill();
+  plainProgress = on
+    ? ScrollTrigger.create({
+        trigger: splash,
+        start: 'top top',
+        end: 'bottom top',
+        onUpdate: (self) => progress.set(self.progress),
+        onRefresh: (self) => progress.set(self.progress),
+      })
+    : null;
+}
+
+// In the flat version each later scene is its own section: the next dot fills as it
+// scrolls up into view. (In 3D the pinned splash reports the whole journey itself.)
+let sceneProgress = [];
+function trackScenes(on) {
+  sceneProgress.forEach((t) => t.kill());
+  sceneProgress = on
+    ? [...document.querySelectorAll('.scene:not(.scene--first)')].map((el) => {
+        const n = parseInt(el.id.slice(-2), 10);
+        const set = (self) => self.progress > 0 && progress.set(n - 1 + self.progress);
+        return ScrollTrigger.create({ trigger: el, start: 'top bottom', end: 'top top', onUpdate: set, onRefresh: set });
+      })
+    : [];
+  // the breadcrumb and scroll cue belong to the scenes: show them once scene 01 is half in
+  if (on)
+    sceneProgress.push(
+      ScrollTrigger.create({
+        trigger: '#scene-01',
+        start: 'top 50%',
+        onEnter: () => root.classList.add('in-scene'),
+        onLeaveBack: () => root.classList.remove('in-scene'),
+      }),
+    );
+}
 
 const webgl = (() => {
   try {
@@ -85,6 +126,7 @@ function renderMotion() {
       startDOM({ animate: false });
     }
     portal?.disableZoom();
+    trackPlainScroll(true);
   } else if (!splash3d) {
     setupTitle({ animate: false }); // try 3D again, or re-enable the 2D zoom
   }
@@ -150,6 +192,7 @@ function startDOM({ animate }) {
     portal: portalEl,
     image: portalEl.querySelector('.portal__img'),
     fade: FADE,
+    onChapter: progress.set,
   });
   if (animate) {
     // letters thicken in, and the window into scene 01 opens once its letter is drawn
@@ -171,22 +214,27 @@ function startDOM({ animate }) {
   }
   portal.refresh();
   if (state.motion === 'on') portal.enableZoom();
+  trackPlainScroll(state.motion !== 'on');
+  trackScenes(true);
   ScrollTrigger.refresh();
 }
 
-// In 3D the scene 01 text sits on the pinned splash, over the live scene; it goes back
-// into its own section for the flat version.
+// In 3D each scene's text sits on the pinned splash, over the live scene; it goes back
+// into its own section for the flat version. data-scene-copy is the scene number.
 const sceneCopy = [...document.querySelectorAll('[data-scene-copy]')];
-const scene01 = document.getElementById('scene-01');
+const sceneOf = (el) => document.getElementById(`scene-${el.dataset.sceneCopy.padStart(2, '0')}`);
 const moveCopy = (to3d) => {
-  for (const el of sceneCopy) (to3d ? splash : scene01).append(el);
+  for (const el of sceneCopy) (to3d ? splash : sceneOf(el)).append(el);
   gsap.set(sceneCopy, { clearProps: 'all' });
   root.classList.toggle('in-scene', !to3d);
 };
-function showScene(t) {
-  // t: 0 hidden -> 1 shown, scrubbed with the scroll as you land in scene 01
-  gsap.set(sceneCopy, { autoAlpha: t, y: (1 - t) * 14 });
-  root.classList.toggle('in-scene', t > 0.5);
+const shown = {};
+function showScene(n, t) {
+  // t: 0 hidden -> 1 shown, scrubbed with the scroll as you arrive in scene n
+  if (shown[n] === t) return;
+  shown[n] = t;
+  gsap.set(sceneCopy.filter((el) => el.dataset.sceneCopy === String(n)), { autoAlpha: t, y: (1 - t) * 14 });
+  root.classList.toggle('in-scene', Object.values(shown).some((v) => v > 0.5));
 }
 
 async function start3D({ animate }) {
@@ -204,6 +252,7 @@ async function start3D({ animate }) {
         salmonEl: splash.querySelector('.splash__salmon'),
         fade: '.splash__choice',
         onScene: showScene,
+        onChapter: progress.set,
       }),
     );
     const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 2500));
@@ -221,6 +270,8 @@ async function start3D({ animate }) {
     return false;
   }
   portal?.disableZoom();
+  trackPlainScroll(false);
+  trackScenes(false);
   if (animate) introTl = splash3d.intro();
   else splash3d.showStill();
   splash3d.enableZoom();

@@ -17,6 +17,9 @@ export const strings = {
     s01Title: 'The Well',
     s01Hook: 'Before the world was as it is, there was a deep well of water.',
     s01Body: 'The Well of Segais was hidden away near Carbury in County Kildare, where the rivers of Ireland were said to rise. The river Boyne came out of it first. Around the well grew nine hazel trees, and every autumn their nuts dropped into the water. Inside every nut was a share of all that was ever known.',
+    s02Title: 'The First Man',
+    s02Hook: 'He had been alive since before the flood.',
+    s02Body: 'Fintan mac Bóchra came to Ireland with the first people ever to set foot on the island. After the great flood rose, Fintan was the only one to live. He survived by changing his shape first into an eagle, then a hawk, and in the end a salmon. Up to the well he swam, and there he ate nine nuts, one from every tree. With the ninth, he had the knowledge of the world inside him, and away down the Boyne he went.',
   },
   ga: {
     title: 'Bra[d]án\nan Feasa',
@@ -34,13 +37,16 @@ export const strings = {
     s01Title: 'An Tobar',
     s01Hook: 'Before the world was as it is, there was a deep well of water.',
     s01Body: 'The Well of Segais was hidden away near Carbury in County Kildare, where the rivers of Ireland were said to rise. The river Boyne came out of it first. Around the well grew nine hazel trees, and every autumn their nuts dropped into the water. Inside every nut was a share of all that was ever known.',
+    s02Title: 'An Chéad Fhear',
+    s02Hook: 'He had been alive since before the flood.',
+    s02Body: 'Fintan mac Bóchra came to Ireland with the first people ever to set foot on the island. After the great flood rose, Fintan was the only one to live. He survived by changing his shape first into an eagle, then a hawk, and in the end a salmon. Up to the well he swam, and there he ate nine nuts, one from every tree. With the ninth, he had the knowledge of the world inside him, and away down the Boyne he went.',
   },
 };
 
 export function applyStrings(lang) {
   const t = strings[lang];
   document.documentElement.lang = lang;
-  document.title = t.documentTitle;
+  document.title = `${t.documentTitle} · Scéalta`;
   for (const el of document.querySelectorAll('[data-i18n]')) {
     const key = el.dataset.i18n;
     if (key !== 'title') el.textContent = t[key]; // the title is built by title.js

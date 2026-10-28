@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>The Salmon of Knowledge</title>
+    <title>The Salmon of Knowledge · Scéalta</title>
     <meta name="description" content="An illustrated retelling of Bradán an Feasa, the Irish myth of the Salmon of Knowledge, in six scenes." />
     <meta name="theme-color" content="#050A06" />
     <link rel="preload" href="/fonts/gaillimh-black.woff2" as="font" type="font/woff2" crossorigin />
@@ -12,7 +12,12 @@
   </head>
   <body>
     <header class="topbar" aria-label="Story controls">
-      <p class="label topbar__mark" lang="ga">Bradán an Feasa</p>
+      <nav class="label topbar__mark" aria-label="Breadcrumb">
+        <ol class="crumbs">
+          <li class="crumbs__site" lang="ga">Scéalta</li>
+          <li aria-current="page"><i data-lucide="chevron-right" aria-hidden="true"></i><span data-i18n="documentTitle">The Salmon of Knowledge</span></li>
+        </ol>
+      </nav>
       <div class="controls">
         <button class="pill" type="button" data-control="sound" aria-pressed="false">
           <i data-lucide="volume-x" aria-hidden="true"></i>
@@ -77,20 +82,37 @@
           <source type="image/avif" srcset="/images/s01-960.avif 960w, /images/s01-1600.avif 1600w, /images/s01-2400.avif 2400w, /images/s01-2912.avif 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" />
           <img class="scene__img" src="/images/s01-1600.webp" srcset="/images/s01-960.webp 960w, /images/s01-1600.webp 1600w, /images/s01-2400.webp 2400w, /images/s01-2912.webp 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" width="2912" height="1632" alt="Seen from above at night, a woodland pool glows beneath its surface, ringed by dark trees in the falling rain." />
         </picture>
-        <div class="scene__scrim" aria-hidden="true" data-scene-copy></div>
+        <div class="scene__scrim" aria-hidden="true" data-scene-copy="1"></div>
         <!-- In 3D mode this copy is moved onto the splash, over the live scene -->
-        <div class="scene__copy" data-scene-copy>
+        <div class="scene__copy" data-scene-copy="1">
           <h2 class="scene__title" data-i18n="s01Title">The Well</h2>
           <p class="scene__hook" data-i18n="s01Hook">Before the world was as it is, there was a deep well of water.</p>
           <div class="scene__rule" aria-hidden="true"></div>
           <p class="scene__body" data-i18n="s01Body">The Well of Segais was hidden away near Carbury in County Kildare, where the rivers of Ireland were said to rise. The river Boyne came out of it first. Around the well grew nine hazel trees, and every autumn their nuts dropped into the water. Inside every nut was a share of all that was ever known.</p>
         </div>
-        <div class="scene__progress label" data-scene-copy>
-          <span>01 / 06</span>
-          <span class="dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></span>
+      </section>
+
+      <!-- In 3D the camera dives through scene 01's pool into this one (src/three/scene02.js) -->
+      <section class="scene" id="scene-02" aria-label="Scene 2, The First Man" tabindex="-1">
+        <picture>
+          <source type="image/avif" srcset="/images/s02-960.avif 960w, /images/s02-1600.avif 1600w, /images/s02-2400.avif 2400w, /images/s02-2912.avif 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" />
+          <img class="scene__img" src="/images/s02-1600.webp" srcset="/images/s02-960.webp 960w, /images/s02-1600.webp 1600w, /images/s02-2400.webp 2400w, /images/s02-2912.webp 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" width="2912" height="1632" loading="lazy" alt="Underwater in the dark, a great salmon drawn in fine green lines swims among drifting hazelnuts, framed by hazel leaves." />
+        </picture>
+        <div class="scene__scrim" aria-hidden="true" data-scene-copy="2"></div>
+        <div class="scene__copy" data-scene-copy="2">
+          <h2 class="scene__title" data-i18n="s02Title">The First Man</h2>
+          <p class="scene__hook" data-i18n="s02Hook">He had been alive since before the flood.</p>
+          <div class="scene__rule" aria-hidden="true"></div>
+          <p class="scene__body" data-i18n="s02Body">Fintan mac Bóchra came to Ireland with the first people ever to set foot on the island. After the great flood rose, Fintan was the only one to live. He survived by changing his shape first into an eagle, then a hawk, and in the end a salmon. Up to the well he swam, and there he ate nine nuts, one from every tree. With the ninth, he had the knowledge of the world inside him, and away down the Boyne he went.</p>
         </div>
       </section>
     </main>
+
+    <!-- Chapter progress (src/progress.js): decorative, each scene is a labelled section -->
+    <div class="progress label" aria-hidden="true">
+      <span class="progress__count">01 / 06</span>
+      <span class="dots"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+    </div>
 
     <div class="corner">
       <span class="label corner__scroll" aria-hidden="true"><span data-i18n="scroll">Scroll</span> <i data-lucide="arrow-down"></i></span>
