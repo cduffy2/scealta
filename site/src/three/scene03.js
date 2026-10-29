@@ -129,7 +129,8 @@ export async function loadScene03() {
   group.add(art);
 
   // the plate, running on below the painting: just its water band, mirrored and stretched,
-  // fading to the dark of scene 02's depths, so the rise up through the surface has no edge
+  // fading to scene 02's water and then away into it, so the rise up through the surface
+  // has no edge
   const h = (D * PH) / PW;
   const geom = new THREE.PlaneGeometry(D, h * (1 + EXT), 1, 24);
   geom.translate(0, (-h * EXT) / 2, 0);
@@ -140,11 +141,11 @@ export async function loadScene03() {
     const below = v;
     if (v < 0) v = (v / EXT) * WATER_BAND; // below the foot: only the bottom water band, mirrored
     uv.setY(i, v);
-    const k = 1 - THREE.MathUtils.smoothstep(-below, 0.0, 0.14); // the painting's foot melts into the dark
-    colors.push(k, k, k);
+    const k = 1 - THREE.MathUtils.smoothstep(-below, 0.0, 0.14); // the painting's foot melts into the water
+    colors.push(k, k, k, THREE.MathUtils.smoothstep(below, -EXT, -EXT * 0.55)); // and fades out lower down
   }
-  geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  const plateMat = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true });
+  geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
+  const plateMat = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, transparent: true });
   // The river moves: below the surface the painting sways a little from side to side and
   // its stripes undulate, more towards the front than out by the far bank, with a faint
   // shimmer. A mask (scripts/s03_water.py) keeps the banks still, and no bank pixel is
@@ -170,7 +171,7 @@ export async function loadScene03() {
         diffuseColor.rgb *= 1.0 + 0.06 * wet * sin(wuv.x * 38.0 + py * 0.3 + uTime * 0.7);
         `,
       )
-      .replace('#include <color_fragment>', 'diffuseColor.rgb = mix(uBg, diffuseColor.rgb, vColor.r);');
+      .replace('#include <color_fragment>', 'diffuseColor.rgb = mix(uBg, diffuseColor.rgb, vColor.r);\ndiffuseColor.a *= vColor.a;');
   };
   const plate = new THREE.Mesh(geom, plateMat);
   art.add(plate);

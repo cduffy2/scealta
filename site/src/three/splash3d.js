@@ -166,7 +166,10 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     scene02.layout(t2End);
     scene03.group.position.set(pool.x, pool.y + RISE_Y, END_Z);
     scene03.layout({ w: (t2End * W) / H, h: t2End });
-    const fp = scene02.fishPose(SALMON_LENGTH, SALMON_HEIGHT, { w: (t2End * W) / H, h: t2End });
+    // his head stays clear of scene 02's text, with room for the swim's surge
+    const copy2 = splash.querySelector('.scene__copy[data-scene-copy="2"]')?.getBoundingClientRect();
+    const clearX = copy2?.width ? (copy2.right - fr.left + Math.max(40, W * 0.035)) / W : 0;
+    const fp = scene02.fishPose(SALMON_LENGTH, SALMON_HEIGHT, { w: (t2End * W) / H, h: t2End }, clearX);
     poses = {
       splash: {
         rest: new THREE.Vector3(start.x + (cx - W / 2) * su, start.y + (H / 2 - cy) * su, TITLE_Z + 0.4),
