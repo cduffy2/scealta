@@ -15,6 +15,8 @@ import { ribbon as markRibbon, ringMaterial } from './marks.js';
 //
 // It opens out of scene 03, from where Finegas's line goes into the river (setReveal): a
 // widening circle around where the salmon breaks the water (FOCUS), the rest following.
+// Then the camera pans on along to scene 05, which lies beside it on the right: as it
+// does, the night past the painting's right edge gives way to it (setLeave).
 
 const D = 14;
 const EXT = 0.35; // how far the plate runs on past each edge, mirrored (share of its size)
@@ -76,10 +78,11 @@ export async function loadScene04() {
   const [mx, my, mr] = meta.moon;
   const glowU = { value: 0 };
   const revealU = { value: 1 };
+  const leaveU = { value: 0 };
   const plateMat = new THREE.MeshBasicMaterial({ map: plateTex, transparent: true, depthWrite: false });
   plateMat.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, { uTime: timeU, uGlow: glowU, uReveal: revealU });
-    shader.fragmentShader = `uniform float uTime;\nuniform float uGlow;\nuniform float uReveal;\n${shader.fragmentShader}`.replace(
+    Object.assign(shader.uniforms, { uTime: timeU, uGlow: glowU, uReveal: revealU, uLeave: leaveU });
+    shader.fragmentShader = `uniform float uTime;\nuniform float uGlow;\nuniform float uReveal;\nuniform float uLeave;\n${shader.fragmentShader}`.replace(
       '#include <map_fragment>',
       `
       vec2 wuv = vMapUv;
@@ -125,6 +128,8 @@ export async function loadScene04() {
         smoothstep(0.02, 0.25, -wuv.y)
       );
       diffuseColor.a *= 1.0 - clear * (1.0 - smoothstep(0.8, 1.0, uReveal));
+      // on the way along to scene 05, its right edge softens into it
+      diffuseColor.a *= 1.0 - uLeave * smoothstep(0.96, 1.1, wuv.x);
       `,
     );
   };
@@ -381,6 +386,9 @@ export async function loadScene04() {
     layout,
     tick,
     setReveal,
+    setLeave: (k) => (leaveU.value = k),
+    // the painting's left (-1) or right (+1) edge, in the group's space
+    edge: (side) => art.position.x + (side * art.scale.x * D) / 2,
     // where he breaks the water, in the group's space (it opens out from here)
     focus() {
       const [x, y] = toArt(...FOCUS);
