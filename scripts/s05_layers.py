@@ -12,12 +12,19 @@ end so the salmon lies on the right, clear of the text, and Fionn reaches in fro
                                   (clear above the water elsewhere)
   assets/cutouts/s05_flames.png   where the flames are (white), for their flicker
   assets/cutouts/s05_ember_N.png  the painted embers above the fire, each on its own
-  assets/cutouts/s05_hand.png     Fionn's hand, without his sticks (they're drawn live, prodding
-                                  the salmon; where they went into the flames, more flames)
-  assets/cutouts/s05_mirrored.png the whole painting, mirrored (the flat scene)
-  assets/cutouts/s05_fire.json    their boxes, the water's edge, the fire's box, and where
-                                  the sticks leave his fingers and meet the salmon
+  assets/cutouts/s05_hand.png     Fionn's hand round his one stick, repainted (below), so it can
+                                  prod the salmon (where the painted sticks went into the
+                                  flames, more flames)
+  assets/cutouts/s05_mirrored.png the whole painting, mirrored, his stick to the salmon (the
+                                  flat scene)
+  assets/cutouts/s05_fire.json    their boxes, the water's edge, the fire's box, and his arm:
+                                  where it turns (at the edge), the stick's tip, where it
+                                  meets the salmon, and how far it turns to get there
 
+The painted hand pinched two sticks down into the fire. It was repainted in Midjourney's
+editor, over this scene as it stood (mirrored, the sticks gone), as a fist round one stick:
+assets/source/s05_thumb_hand.png. Only the hand, his stick and his sleeve are taken from it,
+found as what differs from the scene in the area that was repainted.
 The layers sit at different depths, so the trees and the night lag behind the fire as the
 camera pans along; at rest they line up as painted. The salmon, the flames and the hand are
 told apart from the trees by their warmth (the trees, the night and the water have next to
@@ -38,11 +45,13 @@ FIRE = (340, 1250, 1680, 1440)  # x0, y0, x1, y1: the row of flames
 # Fionn's two sticks, from his fingertips down into the flames: their centre lines
 STICKS = [lambda x: 1313.3 + 0.155 * (x - 220), lambda x: 1325.3 + 0.155 * (x - 220)]
 STICK_X = (200, 488)
-GRIP = [(227, 1316), (227, 1328)]  # where they leave his fingers
-PROD = [(505, 1226), (502, 1237)]  # and where they meet the salmon, under his tail
 HAND_X = 236  # his hand is left of this
 ROW = (345, 1592)  # where the row of flames starts and ends
 SWAP = (340, 1278, 532, 1396)  # x0, y0, x1, y1: the first flames, swapped for the last
+# (mirrored, as the scene is seen) the area that was repainted, and where his stick meets the
+# salmon: the underside of his tail, just in from the fin
+REPAINTED = [(2912, 1165), (2640, 1165), (2605, 1292), (2400, 1246), (2392, 1268), (2585, 1300), (2590, 1362), (2912, 1362)]
+POKE = (2478, 1234)
 
 b, g, r = [art[..., i].astype(int) for i in range(3)]
 warm = (r > 60).astype(np.uint8)
@@ -168,8 +177,6 @@ yy, xx = np.nonzero(hand)
 hx0, hx1, hy0, hy1 = max(0, xx.min() - 3), xx.max() + 4, yy.min() - 3, yy.max() + 4
 outputs["s05_hand.png"] = np.dstack([art[hy0:hy1, hx0:hx1], (ha[hy0:hy1, hx0:hx1] * 255).astype(np.uint8)])
 meta["hand"] = {"x": int(hx0), "y": int(hy0), "w": int(hx1 - hx0), "h": int(hy1 - hy0)}
-meta["grip"] = [list(p) for p in GRIP]
-meta["prod"] = [list(p) for p in PROD]
 
 # The near layer: the water, the grill, the fire and the salmon.
 outputs["s05_near.png"] = np.dstack([nearRGB, (np.clip(nearA, 0, 1) * 255).astype(np.uint8)])
@@ -183,7 +190,6 @@ flames[fy0:fy1, fx0:fx1] = orange[fy0:fy1, fx0:fx1]
 flames = cv2.dilate(flames, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (17, 17)))
 fl = cv2.resize(feather(flames, 6), (W // 4, H // 4), interpolation=cv2.INTER_AREA)
 outputs["s05_flames.png"] = (np.clip(fl, 0, 1) * 255).astype(np.uint8)
-outputs["s05_mirrored.png"] = art
 
 # Everything mirrored: the images flipped, every x in the meta measured from the other side.
 for name, im in outputs.items():
@@ -192,8 +198,61 @@ box = lambda d: {**d, "x": W - d["x"] - d["w"]}
 meta["embers"] = [box(e) for e in meta["embers"]]
 meta["hand"] = box(meta["hand"])
 meta["fire"] = [W - FIRE[2], FIRE[1], W - FIRE[0], FIRE[3]]
-meta["grip"] = [[W - x, y] for x, y in meta["grip"]]
-meta["prod"] = [[W - x, y] for x, y in meta["prod"]]
 meta["tops"] = [int(np.argmax(trees[:, W - 1 - x])) for x in range(0, W, 16)]  # the trees' top edge, every 16 px
+
+# The repainted hand (mirrored, like everything from here on). The scene as it stood when it
+# was repainted: the layers, the old hand and the embers in place.
+mir = {k: np.ascontiguousarray(v[:, ::-1]) for k, v in outputs.items()}
+
+
+def over(base, im, x, y):
+    h, w = im.shape[:2]
+    a = im[..., 3:4].astype(np.float32) / 255
+    base[y : y + h, x : x + w] = base[y : y + h, x : x + w] * (1 - a) + im[..., :3] * a
+
+
+scene = mir["s05_sky.png"].astype(np.float32)
+over(scene, mir["s05_trees.png"], 0, 0)
+over(scene, mir["s05_near.png"], 0, 0)
+for e in meta["embers"]:
+    over(scene, mir[e["name"] + ".png"], e["x"], e["y"])
+before = scene.copy()
+over(before, mir["s05_hand.png"], meta["hand"]["x"], meta["hand"]["y"])
+edit = cv2.resize(cv2.imread(str(ROOT / "assets/source/s05_thumb_hand.png")), (W, H), interpolation=cv2.INTER_CUBIC)
+# where it was repainted (the hand, and a strip up under his tail for the stick)
+area = np.zeros((H, W), np.uint8)
+cv2.fillPoly(area, [np.array(REPAINTED, np.int32)], 1)
+diff = cv2.GaussianBlur(np.abs(edit.astype(np.float32) - before).sum(2), (0, 0), 2)
+arm = ((diff > 60) & (area > 0)).astype(np.uint8)
+arm = cv2.morphologyEx(arm, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)))
+n, lab, stats, _ = cv2.connectedComponentsWithStats(arm, 8)
+arm = fill_holes((lab == 1 + np.argmax(stats[1:, 4])).astype(np.uint8))
+arm = cv2.erode(arm, np.ones((3, 3), np.uint8))  # just inside its outline
+ys, xs = np.nonzero(arm)
+ax0, ax1, ay0, ay1 = xs.min() - 3, W, ys.min() - 3, ys.max() + 4
+PAD = 60  # his sleeve carries on past the edge, so none of it comes away as he pushes
+rgb = np.concatenate([edit[ay0:ay1, ax0:ax1], np.repeat(edit[ay0:ay1, W - 1 : W], PAD, 1)], 1)
+a = feather(arm, 0.8)[ay0:ay1, ax0:ax1]
+a = np.concatenate([a, np.repeat(a[:, -1:], PAD, 1)], 1)
+handRGBA = np.dstack([rgb, (a * 255).astype(np.uint8)])
+cv2.imwrite(str(ROOT / "assets/cutouts/s05_hand.png"), handRGBA)
+meta["hand"] = {"x": int(ax0), "y": int(ay0), "w": int(ax1 + PAD - ax0), "h": int(ay1 - ay0)}
+edgeYs = np.nonzero(arm[:, W - 1])[0]
+pivot = (float(W), float(edgeYs.mean()))  # his arm turns about where it comes in
+tipX = int(xs.min())
+tip = (float(tipX), float(ys[xs == tipX].mean()))
+ang = np.arctan2(POKE[1] - pivot[1], POKE[0] - pivot[0]) - np.arctan2(tip[1] - pivot[1], tip[0] - pivot[0])
+ang = (ang + np.pi) % (2 * np.pi) - np.pi  # clockwise on screen, as the turn up to him
+meta["arm"] = {"pivot": [pivot[0], round(pivot[1], 1)], "tip": [tip[0], round(tip[1], 1)], "poke": list(POKE), "turn": round(float(np.degrees(ang)), 2)}
+
+# The flat scene: as it stands, his stick turned up to the salmon.
+M = 150  # room above and below for it to turn into
+held = np.pad(handRGBA, ((M, M), (0, 0), (0, 0)))
+R = cv2.getRotationMatrix2D((float(pivot[0] - ax0), float(pivot[1] - ay0 + M)), -float(np.degrees(ang)), 1)
+turned = cv2.warpAffine(held, R, (held.shape[1], held.shape[0]), flags=cv2.INTER_CUBIC, borderValue=(0, 0, 0, 0))
+flat = np.zeros((H + 2 * M, W + PAD, 3), np.float32)
+flat[M : M + H, :W] = scene
+over(flat, turned, ax0, ay0)
+cv2.imwrite(str(ROOT / "assets/cutouts/s05_mirrored.png"), flat[M : M + H, :W].astype(np.uint8))
 (ROOT / "assets/cutouts/s05_fire.json").write_text(json.dumps(meta, indent=2) + "\n")
 print(json.dumps({k: v for k, v in meta.items() if k != "tops"}))

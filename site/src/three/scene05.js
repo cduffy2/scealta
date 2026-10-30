@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import meta from './s05-fire.json';
-import { ribbon as markRibbon } from './marks.js';
 
 // Scene 05, the thumb: Fionn roasting the salmon over the fire at night, by the water. The
 // painting (mirrored, so the salmon lies on the right, clear of the text) is in three layers
@@ -8,7 +7,7 @@ import { ribbon as markRibbon } from './marks.js';
 // water, the grill, the fire and the salmon. The camera pans along to it from scene 04 (a
 // new place, a new time), so the trees and the night lag behind the fire; at rest they line
 // up as painted. Here Fionn's hand reaches in from the right and now and then prods the
-// salmon with his two sticks, the flames flicker, embers drift up from the fire and fade,
+// salmon with his stick, the flames flicker, embers drift up from the fire and fade,
 // now and then a blister swells on the salmon's skin, the stars twinkle, the trees stir and
 // the water sways.
 //
@@ -189,31 +188,28 @@ export async function loadScene05() {
   fireGlow.renderOrder = UNDER + 3;
   near.add(fireGlow);
 
-  // Fionn's hand and his two sticks, held a little apart, reaching in to the salmon's
-  // underside by his tail. Every few seconds he prods him: in quickly, back slowly; between,
-  // his hand bobs a little.
+  // Fionn's hand round his one stick (repainted), reaching in from the right. His arm is
+  // turned up about where it comes in (arm.turn), so the stick rests on the salmon's
+  // underside by his tail; every few seconds he prods him with it, in quickly and back
+  // slowly, turning a touch further up as he pushes. Between, his hand bobs a little.
   const HAND = meta.hand;
+  const ARM = meta.arm;
+  const arm = new THREE.Group(); // turns about where his arm comes in
+  near.add(arm);
+  const pivot = toArt(...ARM.pivot);
   const hand = new THREE.Mesh(
     new THREE.PlaneGeometry((HAND.w * D) / PW, (HAND.h * D) / PW),
     new THREE.MeshBasicMaterial({ map: handTex, transparent: true, depthWrite: false }),
   );
-  hand.renderOrder = UNDER + 3.7; // over the ends of his sticks
-  near.add(hand);
-  const stickMat = (color) => new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false, side: THREE.DoubleSide });
-  // each stick: a dark edge, the wood, and the light along its top (as painted)
-  const sticks = meta.grip.map(() =>
-    [stickMat('#3a2404'), stickMat('#f2c414'), stickMat('#ffe95a')].map((m, i) => {
-      const r = markRibbon(2, m, toArt);
-      r.mesh.renderOrder = UNDER + 3.4 + i * 0.05;
-      near.add(r.mesh);
-      return r;
-    }),
-  );
-  const [gx, gy] = meta.grip[0];
-  const [px, py] = meta.prod[0];
-  const len = Math.hypot(px - gx, py - gy);
-  const dir = [(px - gx) / len, (py - gy) / len]; // along the sticks, towards him
-  const up = dir[0] < 0 ? [dir[1], -dir[0]] : [-dir[1], dir[0]]; // across them, upwards
+  const [hx, hy] = toArt(HAND.x + HAND.w / 2, HAND.y + HAND.h / 2);
+  hand.position.set(hx - pivot[0], hy - pivot[1], 0);
+  hand.renderOrder = UNDER + 3.7; // over him: the stick's tip presses on his side
+  arm.add(hand);
+  const at = (p) => [p[0] - ARM.pivot[0], p[1] - ARM.pivot[1]];
+  const reach = Math.hypot(...at(ARM.poke));
+  const dir = at(ARM.poke).map((v) => v / reach); // along the stick, towards him
+  const past = Math.hypot(...at(ARM.tip)) - reach; // how far the turned tip would reach into him
+  const TURN = THREE.MathUtils.degToRad(ARM.turn);
   let prodT = 1.5; // seconds to the next
   let prod = -1; // 0 -> 1 through one, -1 between
   function poke(dt) {
@@ -223,28 +219,15 @@ export async function loadScene05() {
       prodT = rand(3, 5);
     }
     const k = prod < 0 ? 0 : prod < 0.28 ? 1 - (1 - prod / 0.28) ** 2 : 1 - smooth(prod, 0.28, 1);
-    // px along the sticks: resting just short of him, in to just past his edge
-    const along = -9 + 14 * k;
-    const bob = 2.5 * Math.sin(time * 1.6) + 1.2 * Math.sin(time * 2.9 + 1);
-    const ox = dir[0] * along;
-    const oy = dir[1] * along + bob;
-    hand.position.set(...toArt(HAND.x + HAND.w / 2 + ox, HAND.y + HAND.h / 2 + oy), 0.0055);
-    meta.grip.forEach(([x0, y0], i) => {
-      const [x1, y1] = meta.prod[i];
-      // from inside his grip (his fingers cover the ends) to the tip
-      const from = [x0 - dir[0] * 16 + ox, y0 - dir[1] * 16 + oy];
-      const to = [x1 + ox, y1 + oy];
-      const [edge, wood, light] = sticks[i];
-      edge.set([from, to], (t) => 8.5 - 1.5 * t);
-      wood.set([from, to], (t) => 6 - 1.2 * t);
-      light.set(
-        [from, to].map(([x, y]) => [x + up[0] * 1.6, y + up[1] * 1.6]),
-        (t) => 1.8 - 0.6 * t,
-      );
-    });
+    // px along the stick: its tip resting just on him, then pressed in
+    const along = -past - 2 + 12 * k;
+    const bob = 2 * Math.sin(time * 1.6) + Math.sin(time * 2.9 + 1);
+    arm.position.set(...toArt(ARM.pivot[0] + dir[0] * along, ARM.pivot[1] + dir[1] * along + bob), 0.0055);
+    arm.rotation.z = -(TURN + THREE.MathUtils.degToRad(0.8 * k)); // clockwise on screen: up to him
   }
 
-  // The blister: now and then a small pale dome swells on his skin, shines, and goes down.
+  // The blister: now and then a small pale dome swells on his skin, shines, and bursts,
+  // spattering a little towards Fionn's hand.
   const blisterMat = new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
@@ -277,29 +260,103 @@ export async function loadScene05() {
     [1622, 1140],
     [2272, 1150],
   ];
+  // the spatter: small round drops of his juices, drawn out along their flight
+  const dotMat = () =>
+    new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      uniforms: { uK: { value: 0 } },
+      vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform float uK;
+        void main() {
+          vec2 p = (vUv - 0.5) * 2.0;
+          float r = length(p);
+          vec3 c = mix(vec3(1.0, 0.95, 0.62), vec3(0.95, 0.55, 0.15), smoothstep(0.3, 0.9, r));
+          gl_FragColor = vec4(c, (1.0 - smoothstep(0.75, 1.0, r)) * uK);
+        }`,
+    });
+  const spatter = Array.from({ length: 10 }, () => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), dotMat());
+    m.renderOrder = UNDER + 4.6;
+    m.visible = false;
+    near.add(m);
+    return { m, on: false, x: 0, y: 0, vx: 0, vy: 0, age: 0, size: 8 };
+  });
+  // and where it burst, a wet smear on his skin, drawn out towards the hand, drying off
+  const smear = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), dotMat());
+  smear.renderOrder = UNDER + 4.1;
+  smear.visible = false;
+  near.add(smear);
+  let smearAge = 1;
+  const GRAVITY = 900; // px/s²
   let blisterT = 2.5; // seconds to the next
   let swell = -1; // 0 -> 1 through one, -1 between
   let blisterSize = 50;
+  let burst = false;
+  let bx = 0;
+  let by = 0;
   function bubble(dt) {
     if (swell < 0 && (blisterT -= dt) <= 0) {
       const [x, y] = SKIN[Math.floor(Math.random() * SKIN.length)];
-      blister.position.set(...toArt(x + rand(-20, 20), y + rand(-10, 10)), 0.005);
+      bx = x + rand(-20, 20);
+      by = y + rand(-10, 10);
+      blister.position.set(...toArt(bx, by), 0.005);
       blisterSize = rand(50, 70);
       swell = 0;
+      burst = false;
     }
     if (swell >= 0) {
-      swell += dt / 3.2;
+      swell += dt / 2.6;
+      if (swell >= 0.8 && !burst) {
+        // it bursts: a few drops fly off towards his hand (to the right), and fall
+        burst = true;
+        for (let i = 0, n = 6 + Math.floor(Math.random() * 4); i < n; i++) {
+          const q = spatter.find((o) => !o.on);
+          if (!q) break;
+          const a = rand(-0.8, 0.1); // up and to the right, a few nearly level
+          const v = rand(150, 340);
+          Object.assign(q, { on: true, x: bx + rand(-6, 6), y: by + rand(-6, 4), vx: Math.cos(a) * v, vy: Math.sin(a) * v, age: 0, size: rand(10, 20) });
+        }
+        smearAge = 0;
+        smear.position.set(...toArt(bx + blisterSize * 0.45, by + 2), 0.0051);
+      }
       if (swell >= 1) {
         swell = -1;
         blisterT = rand(6, 10);
       }
     }
-    // up over a second or so, holds, then goes down
-    const k = swell < 0 ? 0 : smooth(swell, 0, 0.4) * (1 - smooth(swell, 0.75, 1));
+    // up over a second or so, shines, then bursts flat
+    const k = swell < 0 ? 0 : smooth(swell, 0, 0.45) * (1 - smooth(swell, 0.8, 0.86));
     const s = ((blisterSize * D) / PW) * (0.3 + 0.7 * k);
     blister.scale.set(s, s * 0.8, 1);
     blister.visible = k > 0;
     blisterMat.uniforms.uK.value = 0.9 * Math.min(1, k * 2);
+    for (const q of spatter) {
+      q.m.visible = q.on;
+      if (!q.on) continue;
+      q.age += dt;
+      q.vy += GRAVITY * dt;
+      q.x += q.vx * dt;
+      q.y += q.vy * dt;
+      if (q.age > 0.9) {
+        q.on = q.m.visible = false;
+        continue;
+      }
+      const speed = Math.hypot(q.vx, q.vy);
+      const stretch = 1 + Math.min(1.2, speed / 500);
+      const size = (q.size * D) / PW;
+      q.m.position.set(...toArt(q.x, q.y), 0.0058);
+      q.m.rotation.z = Math.atan2(-q.vy, q.vx);
+      q.m.scale.set(size * stretch, size / Math.sqrt(stretch), 1);
+      q.m.material.uniforms.uK.value = 0.95 * (1 - smooth(q.age, 0.5, 0.9));
+    }
+    if (smearAge < 1) smearAge = Math.min(1, smearAge + dt / 1.6);
+    smear.visible = smearAge < 1;
+    const spread = smooth(smearAge, 0, 0.12); // out quickly as it bursts, then it dries
+    smear.scale.set(((blisterSize * (0.6 + 1.1 * spread)) * D) / PW, ((blisterSize * 0.42) * D) / PW, 1);
+    smear.material.uniforms.uK.value = 0.7 * (1 - smooth(smearAge, 0.25, 1));
   }
 
   // The embers: the painted ones drift on up and fade; then more keep rising from the fire,
