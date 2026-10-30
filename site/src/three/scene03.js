@@ -24,7 +24,7 @@ const [HIP, SHOULDER] = [finegas.hip, finegas.shoulder];
 const HANDS = { x: 1002, y: 1138 };
 const ELBOW = [946, 1131];
 // the painted rod: leaves his hands at TH degrees, bends BEND along LEN px (fitted)
-const ROD = { th: 53.3, bend: 47.7, len: 780 };
+const ROD = { th: 53.3, bend: 47.7, len: 680 };
 const WATER = 1302; // the river's surface, in the painting's px
 const LAND_MAX = 1880; // past this the far bank's grass covers the water
 const SINK = 70; // how deep the line's end hangs in the water (px)
@@ -389,17 +389,19 @@ export async function loadScene03() {
   // carry to x, and it flies on over the river under gravity (the air hardly slows it), the
   // line running out behind it. The speed it needs for its heading is a plain throw's; it's
   // let go at just that speed, so it carries on without a jolt. Past the window he lets go
-  // anyway, lobbing it at 35°. h: the step.
-  function tryThrow(x, h, late) {
+  // anyway, lobbing it at 35°. In flight (steer) its speed is kept to what it needs to
+  // come down at x, so it lands there whatever the frame rate. h: the step.
+  function tryThrow(x, h, late, steer) {
     const w = P[LINE.n];
     let [ux, uy] = [(w[0] - O[LINE.n][0]) / h, (O[LINE.n][1] - w[1]) / h]; // velocity, y up
     const speed = Math.hypot(ux, uy);
     [ux, uy] = late || speed < 1 ? [Math.cos(rad(35)), Math.sin(rad(35))] : [ux / speed, uy / speed];
-    const dx = Math.min(LAND_MAX - 30, Math.max(x, w[0] + 60)) - w[0];
+    const dx = steer ? x - w[0] : Math.min(LAND_MAX - 30, Math.max(x, w[0] + 60)) - w[0];
     const drop = WATER - w[1] + (dx * uy) / ux; // how far below its line of flight it has to fall
+    if (steer && (dx < 20 || ux < 0.3 || drop <= 0)) return;
     if (ux < 0.3 || drop <= 0) return late && tryThrow(x, h, false); // not heading out yet
     const v = Math.sqrt((G * dx * dx) / (2 * ux * ux * drop));
-    if (speed < v && !late) return;
+    if (speed < v && !late && !steer) return;
     O[LINE.n] = [w[0] - ux * v * h, w[1] + uy * v * h];
     thrown = true;
   }
@@ -441,7 +443,7 @@ export async function loadScene03() {
     if (castT >= THROW[0] && !thrown && !float) {
       aim ??= lerp(AIM[0], AIM[1], Math.random());
       tryThrow(aim, dt / steps, castT >= THROW[1]);
-    }
+    } else if (thrown && !float && aim) tryThrow(aim, dt / steps, false, true);
     reel(dt);
     for (let i = 0; i < steps; i++) stepLine(dt / steps);
     const end = P[LINE.n];
