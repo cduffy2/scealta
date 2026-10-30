@@ -284,6 +284,7 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     scene02.setBrightness(smoothstep(-PLATE_DEPTH + 1.2, -PLATE_DEPTH - 0.4, z));
     // the leaves part outwards again as the camera starts up
     scene02.setArrive(smoothstep(0.78, 1, dive) * (1 - smoothstep(0, 0.35, rise)));
+    scene02.setRiver(smoothstep(0.05, 0.75, rise)); // the water takes on the river's green as you come up
     // the water's surface: a wash as the camera plunges through the pool (coming up into
     // scene 03 needs none: the river fades into the water below it)
     surface.material.opacity = 1 - smoothstep(0.15, 2.4, Math.abs(z + PLATE_DEPTH));

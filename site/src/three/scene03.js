@@ -195,13 +195,16 @@ export async function loadScene03() {
         float near = clamp((${(1 - WATER / PH).toFixed(4)} - wuv.y) / 0.2, 0.0, 1.0);
         float py = wuv.y * ${PH}.0;
         vec2 off = vec2(
-          sin(py * 0.9 + uTime * 1.3) * 0.0011 + sin(py * 0.37 - uTime * 0.8) * 0.0008,
-          sin(wuv.x * 55.0 + uTime * 0.9 + py * 0.05) * 0.0011
+          sin(py * 0.9 + uTime * 1.3) * 0.0018 + sin(py * 0.37 - uTime * 0.8) * 0.0013 +
+            sin(py * 0.11 + wuv.x * 6.0 - uTime * 0.45) * 0.0012, // a slow, longer swell
+          sin(wuv.x * 55.0 + uTime * 0.9 + py * 0.05) * 0.0016
         ) * (0.3 + 0.7 * near) * wet;
         float wet2 = wuv.y + off.y < 0.0 ? 1.0 : texture2D(uWater, wuv + off).r;
         off *= step(0.5, wet2);
         diffuseColor *= texture2D(map, wuv + off);
-        diffuseColor.rgb *= 1.0 + 0.06 * wet * sin(wuv.x * 38.0 + py * 0.3 + uTime * 0.7);
+        // shimmer, and faint glints drifting slowly downstream
+        diffuseColor.rgb *= 1.0 + wet * (0.09 * sin(wuv.x * 38.0 + py * 0.3 + uTime * 0.7) +
+          0.07 * pow(0.5 + 0.5 * sin(wuv.x * 90.0 - uTime * 0.6 + sin(py * 0.2 + uTime * 0.3) * 2.0), 6.0));
         `,
       )
       .replace('#include <color_fragment>', 'diffuseColor.rgb = mix(uBg, diffuseColor.rgb, vColor.r);\ndiffuseColor.a *= vColor.a;');
@@ -308,6 +311,81 @@ export async function loadScene03() {
   art.add(splash);
   let splashAge = 1;
   let lapT = 2; // seconds to the next small ring where the line goes in
+
+  // ---- swallows ----------------------------------------------------------------------------
+  // Every so often two or three swallows dart low across the river, flicking their wings in
+  // bursts between glides, and now and then one dips to the water and leaves a small ring.
+  const ringMat = splashMat.clone(); // a ring of their own, so it can't cut the line's short
+  const ring = new THREE.Mesh(splash.geometry, ringMat);
+  ring.scale.setScalar(0.4);
+  ring.visible = false;
+  art.add(ring);
+  let ringAge = 1;
+  const birds = [0, 1, 2].map(() => {
+    const r = ribbon(5, strip(new THREE.Color('#e8e2c4'), 0.95));
+    r.mesh.position.z = 0.012;
+    r.mesh.renderOrder = 6;
+    art.add(r.mesh);
+    return { ...r, on: false };
+  });
+  let flockT = 5; // seconds to the next pass
+  function launch() {
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    const n = Math.random() < 0.5 ? 2 : 3;
+    const dipper = Math.floor(Math.random() * n * 1.5); // sometimes none of them
+    birds.forEach((b, i) =>
+      Object.assign(b, {
+        on: i < n,
+        dir,
+        t: -i * 0.3 - Math.random() * 0.25, // they follow one another
+        y: 1195 + Math.random() * 65, // skimming low over the water
+        speed: 900 + Math.random() * 250, // px/s: across the river in about 3 s
+        phase: Math.random() * 6,
+        dip: i === dipper ? lerp(1250, 1700, Math.random()) : null, // where it touches the water
+        dipped: false,
+      }),
+    );
+  }
+  function flyBirds(dt) {
+    if (active && (flockT -= dt) <= 0 && !birds.some((b) => b.on)) {
+      launch();
+      flockT = 15 + Math.random() * 10;
+    }
+    for (const b of birds) {
+      if (b.on) b.t += dt;
+      if (!b.on || b.t < 0) {
+        b.set([], () => 0);
+        continue;
+      }
+      const x = (b.dir > 0 ? -60 : PW + 60) + b.dir * b.speed * b.t;
+      if (x < -80 || x > PW + 80) b.on = false;
+      let y = b.y + Math.sin(b.t * 2.3 + b.phase) * 22;
+      if (b.dip) {
+        const k = Math.exp(-(((x - b.dip) / 170) ** 2)); // down to the surface and up again
+        y = lerp(y, WATER - 5, k);
+        if (k > 0.97 && !b.dipped) {
+          b.dipped = true;
+          ring.position.set(...toArt(x, WATER), 0.005);
+          ringAge = 0;
+        }
+      }
+      // wings beat in quick bursts between glides (held a little raised)
+      const beating = Math.sin(b.t * 1.9 + b.phase) > -0.3;
+      const f = beating ? Math.sin(b.t * 24 + b.phase) : 0.3;
+      const pts = [
+        [x - 22, y - 14 * f],
+        [x - 10, y - 3 - 3 * f],
+        [x, y],
+        [x + 10, y - 3 - 3 * f],
+        [x + 22, y - 14 * f],
+      ];
+      b.set(pts, (k) => lerp(1.8, 5.2, 1 - Math.abs(k * 2 - 1)));
+    }
+    if (ringAge < 1) ringAge = Math.min(1, ringAge + dt / 1.8);
+    ring.visible = ringAge < 1;
+    ringMat.uniforms.uAge.value = ringAge;
+    ringMat.uniforms.uStrength.value = 0.4;
+  }
 
   // ---- the line: a rope of points under gravity, held at the rod's tip ----------------
   // There's a small weight on its end (not drawn), and he casts it the way you cast a
@@ -421,6 +499,7 @@ export async function loadScene03() {
   let wait = 3;
   function tick(dt) {
     waterTime.value += dt;
+    flyBirds(dt);
     if (castT < 0 && active && (wait -= dt) <= 0) {
       castT = 0;
       [thrown, aim] = [false, null];
