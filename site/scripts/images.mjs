@@ -19,7 +19,7 @@ const jobs = [
   ['s03-norod', 'cutouts/s03_no-rod.png', [1600, 2912]], // scene 03 for 3D: rod and line drawn live
   ['s04', 'source/s04_catch_up.png', [960, 1600, 2400, 2912]], // flat scene 04 (2D fallback)
   ['s04-plate', 'cutouts/s04_plate.png', [1600, 2912]], // scene 04 for 3D: the salmon, line and drops live
-  ['s05', 'source/s05_thumb_up.png', [960, 1600, 2400, 2912]], // flat scene 05 (2D fallback)
+  ['s05', 'cutouts/s05_mirrored.png', [960, 1600, 2400, 2912]], // flat scene 05 (2D fallback), mirrored like the 3D one
 ];
 
 await mkdir(out, { recursive: true });
@@ -96,7 +96,7 @@ for (const name of ['s04_salmon', ...catchMeta.drops.map((d) => d.name)]) {
 await writeFile(path.resolve(here, '../src/three/s04-catch.json'), JSON.stringify(catchMeta, null, 2) + '\n');
 
 // Scene 05's layers (scripts/s05_layers.py): the night, the trees and the fire in depth, at
-// two sizes like scene 04's plate, the flames' mask, and the embers, moved live.
+// two sizes like scene 04's plate, the flames' mask, and Fionn's hand and the embers, moved live.
 const s05Out = path.join(out, 's05');
 await mkdir(s05Out, { recursive: true });
 for (const name of ['sky', 'trees', 'near']) {
@@ -106,7 +106,7 @@ for (const name of ['sky', 'trees', 'near']) {
 }
 await sharp(path.join(assets, 'cutouts/s05_flames.png')).webp({ lossless: true }).toFile(path.join(s05Out, 'flames.webp'));
 const fireMeta = JSON.parse(await readFile(path.join(assets, 'cutouts/s05_fire.json'), 'utf8'));
-for (const { name } of fireMeta.embers) {
+for (const name of ['s05_hand', ...fireMeta.embers.map((e) => e.name)]) {
   await sharp(path.join(assets, `cutouts/${name}.png`)).webp({ quality: 90, alphaQuality: 95 }).toFile(path.join(s05Out, `${name.slice(4)}.webp`));
 }
 await writeFile(path.resolve(here, '../src/three/s05-fire.json'), JSON.stringify(fireMeta, null, 2) + '\n');

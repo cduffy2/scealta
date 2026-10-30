@@ -1,13 +1,16 @@
 import * as THREE from 'three';
 import meta from './s05-fire.json';
+import { ribbon as markRibbon } from './marks.js';
 
 // Scene 05, the thumb: Fionn roasting the salmon over the fire at night, by the water. The
-// painting is in three layers at different depths (scripts/s05_layers.py): the night, the
-// trees, and near to us the water, the grill, the fire, the salmon and Fionn's hand. The
-// camera pans along to it from scene 04 (a new place, a new time), so the trees and the
-// night lag behind the fire; at rest they line up as painted. Here the flames flicker,
-// embers drift up from the fire and fade, now and then a blister swells on the salmon's
-// skin, the stars twinkle, the trees stir and the water sways.
+// painting (mirrored, so the salmon lies on the right, clear of the text) is in three layers
+// at different depths (scripts/s05_layers.py): the night, the trees, and near to us the
+// water, the grill, the fire and the salmon. The camera pans along to it from scene 04 (a
+// new place, a new time), so the trees and the night lag behind the fire; at rest they line
+// up as painted. Here Fionn's hand reaches in from the right and now and then prods the
+// salmon with his two sticks, the flames flicker, embers drift up from the fire and fade,
+// now and then a blister swells on the salmon's skin, the stars twinkle, the trees stir and
+// the water sways.
 //
 // Work is done in the painting's pixels (2912 x 1632, y down), mapped onto a plate D units
 // wide at depth D in front of the camera's rest (cover framing, like scene 04); the far
@@ -27,7 +30,7 @@ const smooth = THREE.MathUtils.smoothstep;
 const UNDER = 2;
 // how far back each layer is, as a share of D
 const DEPTH = { sky: 1.5, trees: 1.18, near: 1 };
-const GRILL = [150, 1370, 1790]; // x0, top, x1 of the grill (it stands still in the water)
+const GRILL = [1122, 1370, 2762]; // x0, top, x1 of the grill (it stands still in the water)
 const NIGHT = 'vec3(0.012, 0.035, 0.012)';
 
 // a soft round light, uK its strength
@@ -56,11 +59,12 @@ export async function loadScene05() {
     return t;
   };
   const size = window.innerWidth < 1000 ? 1600 : 2912;
-  const [skyTex, treesTex, nearTex, flamesTex, ...emberTex] = await Promise.all([
+  const [skyTex, treesTex, nearTex, flamesTex, handTex, ...emberTex] = await Promise.all([
     load(`/images/s05/sky-${size}.webp`),
     load(`/images/s05/trees-${size}.webp`),
     load(`/images/s05/near-${size}.webp`),
     load('/images/s05/flames.webp', false),
+    load('/images/s05/hand.webp'),
     ...meta.embers.map((e) => load(`/images/s05/${e.name.slice(4)}.webp`)),
   ]);
 
@@ -185,6 +189,61 @@ export async function loadScene05() {
   fireGlow.renderOrder = UNDER + 3;
   near.add(fireGlow);
 
+  // Fionn's hand and his two sticks, held a little apart, reaching in to the salmon's
+  // underside by his tail. Every few seconds he prods him: in quickly, back slowly; between,
+  // his hand bobs a little.
+  const HAND = meta.hand;
+  const hand = new THREE.Mesh(
+    new THREE.PlaneGeometry((HAND.w * D) / PW, (HAND.h * D) / PW),
+    new THREE.MeshBasicMaterial({ map: handTex, transparent: true, depthWrite: false }),
+  );
+  hand.renderOrder = UNDER + 3.7; // over the ends of his sticks
+  near.add(hand);
+  const stickMat = (color) => new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+  // each stick: a dark edge, the wood, and the light along its top (as painted)
+  const sticks = meta.grip.map(() =>
+    [stickMat('#3a2404'), stickMat('#f2c414'), stickMat('#ffe95a')].map((m, i) => {
+      const r = markRibbon(2, m, toArt);
+      r.mesh.renderOrder = UNDER + 3.4 + i * 0.05;
+      near.add(r.mesh);
+      return r;
+    }),
+  );
+  const [gx, gy] = meta.grip[0];
+  const [px, py] = meta.prod[0];
+  const len = Math.hypot(px - gx, py - gy);
+  const dir = [(px - gx) / len, (py - gy) / len]; // along the sticks, towards him
+  const up = dir[0] < 0 ? [dir[1], -dir[0]] : [-dir[1], dir[0]]; // across them, upwards
+  let prodT = 1.5; // seconds to the next
+  let prod = -1; // 0 -> 1 through one, -1 between
+  function poke(dt) {
+    if (prod < 0 && (prodT -= dt) <= 0) prod = 0;
+    if (prod >= 0 && (prod += dt / 0.9) >= 1) {
+      prod = -1;
+      prodT = rand(3, 5);
+    }
+    const k = prod < 0 ? 0 : prod < 0.28 ? 1 - (1 - prod / 0.28) ** 2 : 1 - smooth(prod, 0.28, 1);
+    // px along the sticks: resting just short of him, in to just past his edge
+    const along = -9 + 14 * k;
+    const bob = 2.5 * Math.sin(time * 1.6) + 1.2 * Math.sin(time * 2.9 + 1);
+    const ox = dir[0] * along;
+    const oy = dir[1] * along + bob;
+    hand.position.set(...toArt(HAND.x + HAND.w / 2 + ox, HAND.y + HAND.h / 2 + oy), 0.0055);
+    meta.grip.forEach(([x0, y0], i) => {
+      const [x1, y1] = meta.prod[i];
+      // from inside his grip (his fingers cover the ends) to the tip
+      const from = [x0 - dir[0] * 16 + ox, y0 - dir[1] * 16 + oy];
+      const to = [x1 + ox, y1 + oy];
+      const [edge, wood, light] = sticks[i];
+      edge.set([from, to], (t) => 8.5 - 1.5 * t);
+      wood.set([from, to], (t) => 6 - 1.2 * t);
+      light.set(
+        [from, to].map(([x, y]) => [x + up[0] * 1.6, y + up[1] * 1.6]),
+        (t) => 1.8 - 0.6 * t,
+      );
+    });
+  }
+
   // The blister: now and then a small pale dome swells on his skin, shines, and goes down.
   const blisterMat = new THREE.ShaderMaterial({
     transparent: true,
@@ -211,12 +270,12 @@ export async function loadScene05() {
   near.add(blister);
   // places on his side, clear of his spots' thickest patches and his gill
   const SKIN = [
-    [760, 1090],
-    [905, 1060],
-    [1040, 1130],
-    [1180, 1075],
-    [1290, 1140],
-    [640, 1150],
+    [2152, 1090],
+    [2007, 1060],
+    [1872, 1130],
+    [1732, 1075],
+    [1622, 1140],
+    [2272, 1150],
   ];
   let blisterT = 2.5; // seconds to the next
   let swell = -1; // 0 -> 1 through one, -1 between
@@ -264,7 +323,7 @@ export async function loadScene05() {
         e.m.visible = e.light.visible = false;
         if (e.wait <= 0) {
           // from the fire, up from behind him
-          e.x = e.x0 = rand(480, 1520);
+          e.x = e.x0 = rand(1392, 2432);
           e.y = rand(980, 1020);
           e.top = rand(470, 700);
           e.vy = -rand(45, 85);
@@ -295,6 +354,7 @@ export async function loadScene05() {
     timeU.value = time;
     fireU.value = 0.85 + 0.1 * Math.sin(time * 7.3) + 0.06 * Math.sin(time * 13.1 + 1.0);
     fireGlow.material.uniforms.uK.value = 0.2 * fireU.value;
+    poke(dt);
     rise(dt);
     bubble(dt);
   }
@@ -305,7 +365,7 @@ export async function loadScene05() {
     if (view.w < view.h) {
       // portrait: the painting across the top of the screen, the salmon and the fire in view
       const s = (0.45 * view.h) / (PH / PW); // scale so its height is 45% of the view
-      const u = 0.33; // the painting's x at the screen's centre
+      const u = 0.67; // the painting's x at the screen's centre
       frame = { x: (0.5 - u) * D * s, y: ((view.h - (PH / PW) * s) * D) / 2, s };
     } else frame = { x: 0, y: 0, s: 1 };
     // each layer further back is larger in proportion, so they line up from the rest
