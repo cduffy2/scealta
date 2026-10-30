@@ -28,8 +28,9 @@ const ROD = { th: 53.3, bend: 47.7, len: 780 };
 const WATER = 1302; // the river's surface, in the painting's px
 const LAND_MAX = 1880; // past this the far bank's grass covers the water
 const SINK = 70; // how deep the line's end hangs in the water (px)
+const WEIGHT = 8; // the sinker on the line's end: how many times heavier it is than a stretch of line
 const REST_FLOAT = { x: 1520, y: WATER + SINK }; // out in the middle of the river
-const LINE = { n: 36, len: 780 };
+const LINE = { n: 36, len: 660 };
 const COLORS = { rod: new THREE.Color('#dcef36'), line: new THREE.Color('#c8e83d') };
 
 const toArt = (px, py) => [((px - PW / 2) * D) / PW, ((PH / 2 - py) * D) / PW];
@@ -112,6 +113,7 @@ const slopes = CHANNELS.map((_, c) => {
   return KEYS.map((_, i) => (i === 0 || i === n - 1 || d[i - 1] * d[i] <= 0 ? 0 : (2 * d[i - 1] * d[i]) / (d[i - 1] + d[i])));
 });
 const lerp = THREE.MathUtils.lerp;
+const sinkEase = (x) => 1 - (1 - x) ** 3;
 function castPose(t) {
   if (t >= CAST_END) return REST;
   let i = 0;
@@ -304,13 +306,18 @@ export async function loadScene03() {
   let lapT = 2; // seconds to the next small ring where the line goes in
 
   // ---- the line: a rope of points under gravity, held at the rod's tip ----------------
-  // The line pays out to its full length for the cast; once it's in the water he reels in
-  // the slack, so it runs from the rod's tip down into the water with only a gentle sag.
+  // There's a small weight on its end (not drawn): it carries its momentum where the light
+  // line is slowed by the air, so on the backcast it swings round and pulls the line straight
+  // behind, and on the forward cast it leads the line out in an arc. It goes in with a
+  // firmer splash and sinks where it went in until it hangs at its depth, holding the line.
+  // The line pays out to its full length for the cast; once the weight is in he reels in
+  // the slack, so the line runs from the rod's tip down into the water, held fairly straight.
   let seg = LINE.len / LINE.n;
-  const taut = () => (Math.hypot(tip[0] - float.x, tip[1] - float.y) * 1.03) / LINE.n;
+  const taut = () => (Math.hypot(tip[0] - float.x, tip[1] - float.y) * 1.02) / LINE.n;
   const P = Array.from({ length: LINE.n + 1 }, () => [0, 0]);
   const O = Array.from({ length: LINE.n + 1 }, () => [0, 0]);
-  let float = { ...REST_FLOAT }; // where the end lies on the water, or null while it's flying
+  let float = { ...REST_FLOAT }; // where the weight is held in the water, or null while it flies
+  let sinking = null; // while it sinks after going in: { t: seconds since, x, y: where it went in }
   let tip = rodPoints([HANDS.x, HANDS.y], ROD.th, ROD.bend).at(-1);
   function resetLine() {
     for (let i = 0; i <= LINE.n; i++) {
@@ -325,13 +332,16 @@ export async function loadScene03() {
       const p = P[i];
       const o = O[i];
       const wet = p[1] > WATER;
-      const damp = wet ? 0.86 : 0.99; // the water holds it; in the air, some drag
+      const weight = i === LINE.n;
+      // the water holds it; in the air the line feels some drag, the weight hardly any
+      const damp = wet ? (weight ? 0.93 : 0.86) : weight ? 0.9998 : 0.997;
       const vx = (p[0] - o[0]) * damp;
       const vy = (p[1] - o[1]) * damp;
       O[i] = [p[0], p[1]];
       p[0] += vx;
-      p[1] += vy + (wet ? g * 0.12 : g) * h * h; // under the surface it sinks slowly
-      if (p[1] > WATER + SINK * 1.4) p[1] = WATER + SINK * 1.4;
+      p[1] += vy + (wet ? g * (weight ? 0.4 : 0.12) : g) * h * h; // under the surface the line sinks slowly, the weight faster
+      const floor = WATER + (weight ? SINK : SINK * 1.4);
+      if (p[1] > floor) p[1] = floor;
       // it never carries past open water: the line drops short of the far bank's grass
       if (p[0] > LAND_MAX) p[0] = LAND_MAX - (p[0] - LAND_MAX) * 0.2;
     }
@@ -345,8 +355,10 @@ export async function loadScene03() {
         const dy = b[1] - a[1];
         const d = Math.hypot(dx, dy) || 1e-6;
         const diff = (d - seg) / d;
-        const wa = i === 0 ? 0 : 0.5;
-        const wb = i + 1 === LINE.n && float ? 0 : 0.5;
+        // how far each end gives: the rod's tip and a settled weight not at all, the
+        // weight in motion a little (it's heavy), the line freely
+        const wa = i === 0 ? 0 : 1;
+        const wb = i + 1 === LINE.n ? (float ? 0 : 1 / WEIGHT) : 1;
         const s = wa + wb || 1;
         a[0] += (dx * diff * wa) / s;
         a[1] += (dy * diff * wa) / s;
@@ -375,7 +387,7 @@ export async function loadScene03() {
     if (castT >= 0) {
       castT += dt;
       pose = castPose(castT);
-      if (castT > 0.05 && float && castT < 1) float = null; // the line lifts off the water
+      if (castT > 0.05 && castT < 1 && float) [float, sinking] = [null, null]; // he lifts the weight out of the water
       if (castT > CAST_END) castT = -1;
     }
     body.rotation.z = rad(pose.lean);
@@ -389,13 +401,21 @@ export async function loadScene03() {
     const steps = Math.max(1, Math.ceil(dt * 240));
     for (let i = 0; i < steps; i++) stepLine(dt / steps);
     const end = P[LINE.n];
-    if (!float && castT > STOP && end[1] >= WATER) {
-      float = { x: end[0] - 25, y: WATER + SINK }; // it cuts in, and its end settles below
+    if (!float && (castT > STOP || castT < 0) && end[1] >= WATER) {
+      // the weight goes in with a plop and sinks where it went in, holding the line there
+      sinking = { t: 0, x: end[0], y: WATER };
+      float = { x: end[0], y: WATER };
       if (import.meta.env.DEV) window.__cast = { landed: Math.round(end[0]) };
       splash.position.set(...toArt(end[0], WATER), 0.005);
-      splash.scale.setScalar(1);
-      splashMat.uniforms.uStrength.value = 1;
+      splash.scale.setScalar(1.2);
+      splashMat.uniforms.uStrength.value = 1.3;
       splashAge = 0;
+    }
+    // it slows as it sinks, swinging in a little on the line as he takes up the slack
+    if (sinking) {
+      const k = sinkEase(Math.min(1, (sinking.t += dt) / 1.1));
+      float = { x: sinking.x - 30 * k, y: sinking.y + SINK * k };
+      if (k >= 1) sinking = null;
     }
     // above the surface the line is drawn in full; where it goes in, it fades into the water
     let cut = P.findIndex((q) => q[1] > WATER);
