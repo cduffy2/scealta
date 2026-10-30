@@ -13,9 +13,13 @@ import manifest from './s02-layers.json';
 
 const [FW, FH] = manifest.frame; // the painting's frame, 2912 x 1632
 // the water: peaty green, lighter up towards the surface and deeper below. BG is the upper
-// water, which scene 03's river fades down into on the rise.
+// water, which scene 03's river fades down into on the rise. Coming up, both shift to the
+// river's own deep green (sampled from the foot of its painting), so by the time you
+// arrive the water below the river matches it (setRiver).
 export const BG = new THREE.Color('#163020');
 const DEEP = new THREE.Color('#040c07');
+const WATER = [BG.clone(), DEEP.clone()];
+const RIVER = [new THREE.Color('#0b3006'), new THREE.Color('#031a03')];
 const SHAFT = new THREE.Color('#d6e8a8'); // light falling from the surface
 const DEPTH = { particles: 13, leaves: 3.2, nuts: [5.5, 9] };
 // the painted salmon: head tip and vertical extent in the frame (from s02_salmon.png, doubled)
@@ -162,7 +166,14 @@ export async function loadScene02() {
     return { x: tip.x + (length * scale) / 2, y: tip.y, z: -d, scale, viewW: view.w * d };
   }
 
+  // 0 -> 1 on the rise into scene 03: the water turns to the river's green (BG is shared
+  // with scene 03's river, so it follows)
+  function setRiver(k) {
+    BG.lerpColors(WATER[0], RIVER[0], k);
+    DEEP.lerpColors(WATER[1], RIVER[1], k);
+  }
+
   setArrive(0);
   setBrightness(0);
-  return { group, front, layout, setArrive, setBrightness, tick, fishPose };
+  return { group, front, layout, setArrive, setBrightness, setRiver, tick, fishPose };
 }
