@@ -31,6 +31,22 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const OVER = 10; // drawn after scene 03 (render order), which it opens out over
 const G = 900; // px/s²: the drops fall a little slowly, so the eye can follow them
 // the left edge of his body, roughly, where the drops come off (y -> x)
+// a soft round light (the moon's glow, the glint on a drop), uK its strength
+const glow = (falloff = 2.2) =>
+  new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: { uK: { value: 0 } },
+    vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `
+      varying vec2 vUv;
+      uniform float uK;
+      void main() {
+        float r = length((vUv - 0.5) * 2.0);
+        gl_FragColor = vec4(vec3(1.0, 0.96, 0.75), pow(max(0.0, 1.0 - r), ${falloff.toFixed(1)}) * uK);
+      }`,
+  });
 const leftEdge = (y) => lerp(2120, 2214, THREE.MathUtils.clamp((y - 820) / 420, 0, 1));
 
 export async function loadScene04() {
@@ -53,8 +69,11 @@ export async function loadScene04() {
   let time = 0;
   const timeU = { value: 0 };
 
-  // The plate. Below the water's edge the stripes sway and shimmer, and the gold under him
-  // swells and fades as he strains.
+  // The plate. Below the water's edge the stripes sway and shimmer, with faint glints
+  // drifting along, and the gold under him swells and fades as he strains. Above it the
+  // night stirs, as if in a light breeze, and now and then a few of its dashes catch the
+  // light.
+  const [mx, my, mr] = meta.moon;
   const glowU = { value: 0 };
   const revealU = { value: 1 };
   const plateMat = new THREE.MeshBasicMaterial({ map: plateTex, transparent: true, depthWrite: false });
@@ -67,12 +86,29 @@ export async function loadScene04() {
       float below = ${(1 - WATER / PH).toFixed(4)} - wuv.y; // > 0 in the water (and in its mirror below)
       float wet = step(0.0, below);
       float py = wuv.y * ${PH}.0;
+      // clear of the moon's disc and the place under him (his glowing edge stays true)
+      vec2 px = vec2(wuv.x * ${PW}.0, py);
+      float still = max(
+        1.0 - smoothstep(${mr * 1.5}.0, ${mr * 3}.0, length(px - vec2(${mx}.0, ${PH - my}.0))),
+        (1.0 - smoothstep(0.0, 60.0, abs(px.x - 2280.0) - 220.0)) * (1.0 - smoothstep(0.0, 60.0, px.y - ${PH - FISH.y}.0))
+      );
       vec2 off = vec2(
-        sin(py * 0.8 + uTime * 1.2) * 0.0016 + sin(py * 0.3 - uTime * 0.7 + wuv.x * 4.0) * 0.0012,
-        0.0
+        sin(py * 0.9 + uTime * 1.3) * 0.0018 + sin(py * 0.37 - uTime * 0.8) * 0.0013 +
+          sin(py * 0.11 + wuv.x * 6.0 - uTime * 0.45) * 0.0012, // a slow, longer swell
+        sin(wuv.x * 55.0 + uTime * 0.9 + py * 0.05) * 0.0012
       ) * wet * smoothstep(0.0, 0.01, below);
-      diffuseColor *= texture2D(map, wuv + off);
-      diffuseColor.rgb *= 1.0 + wet * 0.08 * sin(wuv.x * 40.0 + py * 0.25 + uTime * 0.8);
+      // the night, in slow broad waves, still at the water's edge
+      off.x += (sin(py * 0.02 + wuv.x * 3.0 - uTime * 0.5) * 0.0007 + sin(py * 0.007 - wuv.x * 1.7 - uTime * 0.23) * 0.0005)
+        * (1.0 - wet) * smoothstep(0.0, 0.03, -below) * (1.0 - still);
+      vec4 texel = texture2D(map, wuv + off);
+      diffuseColor *= texel;
+      // shimmer, and faint glints drifting slowly along
+      diffuseColor.rgb *= 1.0 + wet * (0.08 * sin(wuv.x * 40.0 + py * 0.25 + uTime * 0.8) +
+        0.07 * pow(0.5 + 0.5 * sin(wuv.x * 90.0 - uTime * 0.6 + sin(py * 0.2 + uTime * 0.3) * 2.0), 6.0));
+      // a few of the night's dashes catching the light, here and there, drifting
+      float lum = dot(texel.rgb, vec3(0.3, 0.59, 0.11));
+      float tw = pow(max(0.0, sin(wuv.x * 61.0 + uTime * 0.35 + sin(wuv.y * 9.0) * 2.0) * sin(wuv.y * 47.0 - uTime * 0.27 + wuv.x * 5.0)), 10.0);
+      diffuseColor.rgb *= 1.0 + 0.3 * tw * smoothstep(0.03, 0.12, lum) * (1.0 - wet) * (1.0 - still);
       // the gold where he breaks the water
       float fx = (wuv.x - ${(2275 / PW).toFixed(4)}) / 0.11;
       diffuseColor.rgb *= 1.0 + wet * uGlow * exp(-fx * fx) * exp(-below / 0.03);
@@ -104,22 +140,7 @@ export async function loadScene04() {
   art.add(plate);
 
   // the moon, glowing faintly
-  const [mx, my, mr] = meta.moon;
-  const moonMat = new THREE.ShaderMaterial({
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    uniforms: { uK: { value: 0 } },
-    vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: `
-      varying vec2 vUv;
-      uniform float uK;
-      void main() {
-        float r = length((vUv - 0.5) * 2.0);
-        float a = pow(max(0.0, 1.0 - r), 2.2) * uK;
-        gl_FragColor = vec4(vec3(1.0, 0.96, 0.75), a);
-      }`,
-  });
+  const moonMat = glow();
   const moon = new THREE.Mesh(new THREE.PlaneGeometry((mr * 9 * D) / PW, (mr * 9 * D) / PW), moonMat);
   moon.position.set(...toArt(mx, my), 0.002);
   moon.renderOrder = OVER + 1;
@@ -209,7 +230,18 @@ export async function loadScene04() {
   }
   let swellT = 0.5; // seconds to the next wide ripple from where he is
 
-  // the drops: they start where they're painted and fall; then more keep coming off him
+  // a small soft light, for the glint on a drop and the spray where one lands
+  const spark = (size) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry((size * D) / PW, (size * D) / PW), glow(1.6));
+    m.renderOrder = OVER + 5;
+    m.visible = false;
+    art.add(m);
+    return m;
+  };
+
+  // The drops: they start where they're painted and fall, drawn out along their fall and
+  // catching the light; then more keep coming off him. Where one lands it rings the water,
+  // flashes and throws up a little spray.
   const drops = meta.drops.map((d, i) => {
     const m = new THREE.Mesh(
       new THREE.PlaneGeometry((d.w * D) / PW, (d.h * D) / PW),
@@ -217,8 +249,20 @@ export async function loadScene04() {
     );
     m.renderOrder = OVER + 4;
     art.add(m);
-    return { m, w: d.w, on: true, x: d.x + d.w / 2, y: d.y + d.h / 2, vx: 0, vy: 0, spin: rand(-1, 1), age: 1 };
+    return { m, glint: spark(d.w * 2.4), w: d.w, on: true, x: d.x + d.w / 2, y: d.y + d.h / 2, vx: 0, vy: 0, age: 1 };
   });
+  const flashes = Array.from({ length: 4 }, () => ({ m: spark(70), age: 1 }));
+  const spray = Array.from({ length: 12 }, () => ({ m: spark(16), on: false, x: 0, y: 0, vx: 0, vy: 0 }));
+  function splash(x, w) {
+    const f = flashes.find((q) => q.age >= 1) ?? flashes[0];
+    f.m.position.set(...toArt(x, WATER - 4), 0.009);
+    Object.assign(f, { age: 0, size: 0.6 + w / 60 });
+    for (let k = 0, n = 2 + (Math.random() < 0.5); k < n; k++) {
+      const q = spray.find((o) => !o.on);
+      if (!q) break;
+      Object.assign(q, { on: true, x: x + rand(-6, 6), y: WATER - 6, vx: rand(-70, 70), vy: -rand(130, 230) });
+    }
+  }
   let dropT = 0.6;
   function shed() {
     const d = drops.find((q) => !q.on);
@@ -232,17 +276,16 @@ export async function loadScene04() {
       y,
       vx: right ? rand(30, 90) : -rand(30, 110),
       vy: rand(-90, 20),
-      spin: rand(-1.5, 1.5),
       age: 0,
     });
   }
   function fall(dt) {
     if ((dropT -= dt) <= 0) {
       shed();
-      dropT = rand(0.3, 0.75);
+      dropT = rand(0.6, 1.2);
     }
     for (const d of drops) {
-      d.m.visible = d.on;
+      d.m.visible = d.glint.visible = d.on;
       if (!d.on) continue;
       d.age += dt;
       d.vy += G * dt;
@@ -251,11 +294,39 @@ export async function loadScene04() {
       if (d.y > WATER - 4) {
         d.on = false;
         ring(d.x, 0.25 + d.w / 160, 0.5, 1.2);
+        splash(d.x, d.w);
+        d.m.visible = d.glint.visible = false;
         continue;
       }
+      // drawn out along its fall, the faster the longer
+      const speed = Math.hypot(d.vx, d.vy);
+      const stretch = 1 + Math.min(0.8, speed / 1400);
       d.m.position.set(...toArt(d.x, d.y), 0.008);
-      d.m.rotation.z += d.spin * dt;
-      d.m.material.opacity = Math.min(1, d.age / 0.12) * shown;
+      d.m.rotation.z = Math.atan2(-d.vy, d.vx) - Math.PI / 2;
+      d.m.scale.set(1 / Math.sqrt(stretch), stretch, 1);
+      const a = Math.min(1, d.age / 0.12) * shown;
+      d.m.material.opacity = a;
+      d.glint.position.set(...toArt(d.x, d.y), 0.0075);
+      d.glint.material.uniforms.uK.value = 0.55 * a * (0.8 + 0.2 * Math.sin(time * 9 + d.w));
+    }
+    for (const f of flashes) {
+      if (f.age < 1) f.age = Math.min(1, f.age + dt / 0.3);
+      f.m.visible = f.age < 1;
+      f.m.scale.setScalar(f.size * (0.6 + 0.6 * f.age));
+      f.m.material.uniforms.uK.value = 0.7 * (1 - f.age) ** 2 * shown;
+    }
+    for (const q of spray) {
+      q.m.visible = q.on;
+      if (!q.on) continue;
+      q.vy += G * dt;
+      q.x += q.vx * dt;
+      q.y += q.vy * dt;
+      if (q.y > WATER - 2) {
+        q.on = q.m.visible = false;
+        continue;
+      }
+      q.m.position.set(...toArt(q.x, q.y), 0.009);
+      q.m.material.uniforms.uK.value = 0.8 * shown;
     }
   }
 
