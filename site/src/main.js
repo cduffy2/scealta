@@ -1,3 +1,4 @@
+import { inject } from '@vercel/analytics';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { createIcons, VolumeX, Volume2, Headphones, BookOpen, Pause, Play, ArrowDown, ChevronRight } from 'lucide';
@@ -6,6 +7,9 @@ import { strings, applyStrings } from './i18n.js';
 import { buildTitle, fontsReady, animateTitle, showTitle } from './title.js';
 import { createPortal } from './portal.js';
 import { createProgress } from './progress.js';
+
+// Initialize Vercel Web Analytics
+inject();
 
 gsap.registerPlugin(ScrollTrigger);
 
