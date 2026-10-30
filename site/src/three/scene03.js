@@ -30,7 +30,9 @@ const LAND_MAX = 1880; // past this the far bank's grass covers the water
 const SINK = 70; // how deep the line's end hangs in the water (px)
 const WEIGHT = 8; // the sinker on the line's end: how many times heavier it is than a stretch of line
 const REST_FLOAT = { x: 1520, y: WATER + SINK }; // out in the middle of the river
-const LINE = { n: 36, len: 660 };
+const LINE = { n: 36, len: 1200 };
+const AIM = [1640, 1780]; // where the weight comes down in the river, a little different each cast (px)
+const DROP = 150; // how far below the rod's tip he reels the weight up to before he casts (px)
 const COLORS = { rod: new THREE.Color('#dcef36'), line: new THREE.Color('#c8e83d') };
 
 const toArt = (px, py) => [((px - PW / 2) * D) / PW, ((PH / 2 - py) * D) / PW];
@@ -94,17 +96,18 @@ const CHANNELS = Object.keys(REST);
 const KEYS = [
   // t, th, bend, arm, elbow, lean
   [0.0, ROD.th, ROD.bend, 0, 0, 0],
-  [0.5, 66, 52, 6, 18, 1], // a slow lift, peeling the line off the water
-  [0.86, 110, 24, 26, 50, 4], // the backcast: hand up past his chin, rod swept back
+  [0.5, 66, 52, 6, 18, 1], // a slow lift, reeling the weight up out of the water
+  [0.86, 110, 24, 26, 50, 4], // the backcast: hand up past his chin, the weight swung back
   [1.0, 122, 12, 30, 58, 6], // the stop, his hand up by his ear
-  [1.18, 124, 18, 31, 59, 6], // drifting a touch while the line straightens out behind
-  [1.34, 116, 36, 26, 52, 3], // forward: body and elbow lead, the rod tip lags
-  [1.5, 80, 66, 11, 26, -4], // the drive, the rod deeply loaded
-  [1.6, 54, 34, 5, 10, -6], // the stop: the rod unloads and the line shoots
-  [1.98, 40, 50, -2, -4, -5], // follow-through, the tip dropping towards the water
-  [3.3, ROD.th, ROD.bend, 0, 0, 0],
+  [1.2, 124, 18, 31, 59, 6], // a beat while the weight swings out behind
+  [1.42, 108, 32, 25, 48, 3], // forward: body and elbow lead, the rod tip lags
+  [1.66, 78, 50, 13, 28, -3], // a smooth sweep, lobbing the weight out over the river
+  [1.84, 56, 40, 5, 10, -5], // and an easy stop
+  [2.2, 42, 50, -2, -4, -5], // follow-through, the tip dropping towards the water
+  [3.4, ROD.th, ROD.bend, 0, 0, 0],
 ].map(([t, ...v]) => ({ t, v }));
-const STOP = 1.6;
+const STOP = 1.84;
+const THROW = [1.5, STOP]; // when he can let the line go: as the rod sweeps forward past upright
 const CAST_END = KEYS.at(-1).t;
 // smooth through the keys without overshooting them (monotone cubic, Fritsch-Carlson)
 const slopes = CHANNELS.map((_, c) => {
@@ -113,6 +116,7 @@ const slopes = CHANNELS.map((_, c) => {
   return KEYS.map((_, i) => (i === 0 || i === n - 1 || d[i - 1] * d[i] <= 0 ? 0 : (2 * d[i - 1] * d[i]) / (d[i - 1] + d[i])));
 });
 const lerp = THREE.MathUtils.lerp;
+const G = 2600; // gravity, px/s²
 const sinkEase = (x) => 1 - (1 - x) ** 3;
 function castPose(t) {
   if (t >= CAST_END) return REST;
@@ -306,13 +310,17 @@ export async function loadScene03() {
   let lapT = 2; // seconds to the next small ring where the line goes in
 
   // ---- the line: a rope of points under gravity, held at the rod's tip ----------------
-  // There's a small weight on its end (not drawn): it carries its momentum where the light
-  // line is slowed by the air, so on the backcast it swings round and pulls the line straight
-  // behind, and on the forward cast it leads the line out in an arc. It goes in with a
-  // firmer splash and sinks where it went in until it hangs at its depth, holding the line.
-  // The line pays out to its full length for the cast; once the weight is in he reels in
-  // the slack, so the line runs from the rod's tip down into the water, held fairly straight.
+  // There's a small weight on its end (not drawn), and he casts it the way you cast a
+  // weight: he reels it up to hang just below the rod's tip, swings it back over his
+  // shoulder, then sweeps it forward and lets the line run, so the weight flies out over
+  // the river in an arc, drawing the line off the reel behind it. The weight carries its
+  // momentum where the light line is slowed by the air, and the line is a little stiff, so
+  // it curves rather than folds. The weight goes in with a firm splash and sinks where it
+  // went in, holding the line, and he reels in the slack until it runs from the rod's tip
+  // down into the water, held fairly straight.
   let seg = LINE.len / LINE.n;
+  let thrown = false; // he has let the line go this cast: the weight flies free
+  let aim = null; // where in the river he means it to come down
   const taut = () => (Math.hypot(tip[0] - float.x, tip[1] - float.y) * 1.02) / LINE.n;
   const P = Array.from({ length: LINE.n + 1 }, () => [0, 0]);
   const O = Array.from({ length: LINE.n + 1 }, () => [0, 0]);
@@ -326,15 +334,34 @@ export async function loadScene03() {
       O[i] = [...P[i]];
     }
   }
+  // how far each point gives: the rod's tip and a settled weight not at all, the weight on
+  // the swing a little (it's heavy), the line freely; once thrown, the weight flies free and
+  // the line only follows it
+  const give = (i) => (i === 0 ? 0 : i === LINE.n ? (float || thrown ? 0 : 1 / WEIGHT) : 1);
+  const dist = (i, j) => Math.hypot(P[j][0] - P[i][0], P[j][1] - P[i][1]);
+  // keep points i and j `len` apart; only pull together (side 1), only push apart (side -1)
+  function link(i, j, len, side = 0, k = 1) {
+    const [a, b] = [P[i], P[j]];
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const d = Math.hypot(dx, dy) || 1e-6;
+    if ((side > 0 && d < len) || (side < 0 && d > len)) return;
+    const [wa, wb] = [give(i), give(j)];
+    const f = (k * (d - len)) / d / (wa + wb || 1);
+    a[0] += dx * f * wa;
+    a[1] += dy * f * wa;
+    b[0] -= dx * f * wb;
+    b[1] -= dy * f * wb;
+  }
   function stepLine(h) {
-    const g = 2600; // px/s²
+    const g = G;
     for (let i = 1; i <= LINE.n; i++) {
       const p = P[i];
       const o = O[i];
       const wet = p[1] > WATER;
       const weight = i === LINE.n;
       // the water holds it; in the air the line feels some drag, the weight hardly any
-      const damp = wet ? (weight ? 0.93 : 0.86) : weight ? 0.9998 : 0.997;
+      const damp = wet ? (weight ? 0.93 : 0.86) : weight ? 0.9998 : 0.993;
       const vx = (p[0] - o[0]) * damp;
       const vy = (p[1] - o[1]) * damp;
       O[i] = [p[0], p[1]];
@@ -343,34 +370,45 @@ export async function loadScene03() {
       const floor = WATER + (weight ? SINK : SINK * 1.4);
       if (p[1] > floor) p[1] = floor;
       // it never carries past open water: the line drops short of the far bank's grass
-      if (p[0] > LAND_MAX) p[0] = LAND_MAX - (p[0] - LAND_MAX) * 0.2;
+      if (p[0] > LAND_MAX) [p[0], O[i][0]] = [LAND_MAX, LAND_MAX];
     }
     P[0] = [tip[0], tip[1]];
     if (float) P[LINE.n] = [float.x, float.y];
     for (let k = 0; k < 14; k++) {
       for (let i = 0; i < LINE.n; i++) {
-        const a = P[i];
-        const b = P[i + 1];
-        const dx = b[0] - a[0];
-        const dy = b[1] - a[1];
-        const d = Math.hypot(dx, dy) || 1e-6;
-        const diff = (d - seg) / d;
-        // how far each end gives: the rod's tip and a settled weight not at all, the
-        // weight in motion a little (it's heavy), the line freely
-        const wa = i === 0 ? 0 : 1;
-        const wb = i + 1 === LINE.n ? (float ? 0 : 1 / WEIGHT) : 1;
-        const s = wa + wb || 1;
-        a[0] += (dx * diff * wa) / s;
-        a[1] += (dy * diff * wa) / s;
-        b[0] -= (dx * diff * wb) / s;
-        b[1] -= (dy * diff * wb) / s;
+        link(i, i + 1, seg, thrown && !float ? 1 : 0); // running off the reel it can't be pushed out
+        // stiffness: it can't bend too sharply at any point (two links on can't come in
+        // closer than this, for the links' lengths as they are, so slack line isn't pushed out)
+        if (i < LINE.n - 1) link(i, i + 2, 0.92 * (dist(i, i + 1) + dist(i + 1, i + 2)), -1, 0.5);
       }
     }
   }
 
+  // He lets the line go the moment the weight, swinging forward, is going fast enough to
+  // carry to x, and it flies on over the river under gravity (the air hardly slows it), the
+  // line running out behind it. The speed it needs for its heading is a plain throw's; it's
+  // let go at just that speed, so it carries on without a jolt. Past the window he lets go
+  // anyway, lobbing it at 35°. h: the step.
+  function tryThrow(x, h, late) {
+    const w = P[LINE.n];
+    let [ux, uy] = [(w[0] - O[LINE.n][0]) / h, (O[LINE.n][1] - w[1]) / h]; // velocity, y up
+    const speed = Math.hypot(ux, uy);
+    [ux, uy] = late || speed < 1 ? [Math.cos(rad(35)), Math.sin(rad(35))] : [ux / speed, uy / speed];
+    const dx = Math.min(LAND_MAX - 30, Math.max(x, w[0] + 60)) - w[0];
+    const drop = WATER - w[1] + (dx * uy) / ux; // how far below its line of flight it has to fall
+    if (ux < 0.3 || drop <= 0) return late && tryThrow(x, h, false); // not heading out yet
+    const v = Math.sqrt((G * dx * dx) / (2 * ux * ux * drop));
+    if (speed < v && !late) return;
+    O[LINE.n] = [w[0] - ux * v * h, w[1] + uy * v * h];
+    thrown = true;
+  }
   function reel(dt) {
-    if (!float) seg = LINE.len / LINE.n; // in flight: all of it out
-    else seg += (taut() - seg) * Math.min(1, dt * 1.6);
+    if (float) seg += (taut() - seg) * Math.min(1, dt * 1.6); // taking up the slack
+    else if (thrown) {
+      // the weight draws the line off the reel as it flies: just as much as it needs, with a
+      // little to spare for a gentle sag, so no slack gathers at the rod's tip
+      seg = Math.min(LINE.len / LINE.n, (Math.hypot(P[LINE.n][0] - tip[0], P[LINE.n][1] - tip[1]) * 1.04) / LINE.n);
+    } else seg += (DROP / LINE.n - seg) * Math.min(1, dt * 5); // reeling the weight up to the tip
   }
 
   // ---- the cast ---------------------------------------------------------------------------
@@ -381,6 +419,7 @@ export async function loadScene03() {
     waterTime.value += dt;
     if (castT < 0 && active && (wait -= dt) <= 0) {
       castT = 0;
+      [thrown, aim] = [false, null];
       wait = 8 + Math.random() * 5;
     }
     let pose = REST;
@@ -397,11 +436,15 @@ export async function loadScene03() {
     tip = pts.at(-1);
     rod.set(pts, (f) => lerp(7, 2.4, f));
 
-    reel(dt);
     const steps = Math.max(1, Math.ceil(dt * 240));
+    if (castT >= THROW[0] && !thrown && !float) {
+      aim ??= lerp(AIM[0], AIM[1], Math.random());
+      tryThrow(aim, dt / steps, castT >= THROW[1]);
+    }
+    reel(dt);
     for (let i = 0; i < steps; i++) stepLine(dt / steps);
     const end = P[LINE.n];
-    if (!float && (castT > STOP || castT < 0) && end[1] >= WATER) {
+    if (!float && thrown && end[1] >= WATER) {
       // the weight goes in with a plop and sinks where it went in, holding the line there
       sinking = { t: 0, x: end[0], y: WATER };
       float = { x: end[0], y: WATER };
