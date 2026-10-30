@@ -284,9 +284,9 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     scene02.setBrightness(smoothstep(-PLATE_DEPTH + 1.2, -PLATE_DEPTH - 0.4, z));
     // the leaves part outwards again as the camera starts up
     scene02.setArrive(smoothstep(0.78, 1, dive) * (1 - smoothstep(0, 0.35, rise)));
-    // the water's surface: the plunge through the pool, then a lighter wash coming up
-    const up = rise > 0 ? 1 - smoothstep(0.2, 1.8, Math.abs(camera.position.y - (scene03.group.position.y + scene03.waterY()))) : 0;
-    surface.material.opacity = Math.max(1 - smoothstep(0.15, 2.4, Math.abs(z + PLATE_DEPTH)), up * 0.45);
+    // the water's surface: a wash as the camera plunges through the pool (coming up into
+    // scene 03 needs none: the river fades into the water below it)
+    surface.material.opacity = 1 - smoothstep(0.15, 2.4, Math.abs(z + PLATE_DEPTH));
     scene03.group.visible = rise > 0;
     scene03.setActive(u >= TEXT3_IN[0]); // Finegas casts now and then once you've arrived
     fish.under = dive > 0;

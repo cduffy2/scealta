@@ -510,7 +510,6 @@ export async function loadScene03() {
   tick(0);
 
   // view: the view's width and height per unit depth at the camera's rest
-  let waterY = 0;
   function layout(view) {
     if (view.w < view.h) {
       // portrait: the painting across the top 45% of the screen, Finegas and his line in view
@@ -522,7 +521,6 @@ export async function loadScene03() {
       art.scale.setScalar(1);
       art.position.set(0, 0, -D);
     }
-    waterY = art.position.y + toArt(0, WATER)[1] * art.scale.y;
   }
 
   return {
@@ -531,7 +529,5 @@ export async function loadScene03() {
     tick,
     // casts now and then only while he's in view and the reader has arrived
     setActive: (on) => (active = on),
-    // the river's surface, camera-relative at the rest (for the wash on the way up)
-    waterY: () => waterY,
   };
 }
