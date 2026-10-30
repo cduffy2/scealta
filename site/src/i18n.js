@@ -23,6 +23,9 @@ export const strings = {
     s03Title: 'The Poet',
     s03Hook: 'It was said that anyone who ate this salmon would gain all the wisdom of the world.',
     s03Body: 'Finegas, a druid-poet, had given his life to that prophecy. He built a house on the bank of the Boyne and fished every morning. A boy named Fionn came to study with him, hiding from the men who had killed his father.',
+    s04Title: 'The Catch',
+    s04Hook: 'Then one morning, the water moved differently.',
+    s04Body: 'Finegas felt it before he saw it, a weight on the line unlike any other. Silver, vast, ancient. He told Fionn to cook it carefully, and to eat none of it. Then he went to rest, certain his long wait was finally over.',
   },
   ga: {
     title: 'Bra[d]án\nan Feasa',
@@ -46,6 +49,9 @@ export const strings = {
     s03Title: 'An File',
     s03Hook: 'It was said that anyone who ate this salmon would gain all the wisdom of the world.',
     s03Body: 'Finegas, a druid-poet, had given his life to that prophecy. He built a house on the bank of the Boyne and fished every morning. A boy named Fionn came to study with him, hiding from the men who had killed his father.',
+    s04Title: 'An Ghabháil',
+    s04Hook: 'Then one morning, the water moved differently.',
+    s04Body: 'Finegas felt it before he saw it, a weight on the line unlike any other. Silver, vast, ancient. He told Fionn to cook it carefully, and to eat none of it. Then he went to rest, certain his long wait was finally over.',
   },
 };
 

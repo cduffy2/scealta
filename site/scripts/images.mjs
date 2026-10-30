@@ -17,6 +17,8 @@ const jobs = [
   ['s02', 'source/s02_fintan_up.png', [960, 1600, 2400, 2912]], // flat scene 02 (2D fallback)
   ['s03', 'source/s03_finegas_up.png', [960, 1600, 2400, 2912]], // flat scene 03 (2D fallback)
   ['s03-norod', 'cutouts/s03_no-rod.png', [1600, 2912]], // scene 03 for 3D: rod and line drawn live
+  ['s04', 'source/s04_catch_up.png', [960, 1600, 2400, 2912]], // flat scene 04 (2D fallback)
+  ['s04-plate', 'cutouts/s04_plate.png', [1600, 2912]], // scene 04 for 3D: the salmon, line and drops live
 ];
 
 await mkdir(out, { recursive: true });
@@ -82,3 +84,12 @@ for (const name of ['torso', 'arm']) {
   await sharp(path.join(assets, `cutouts/s03_${name}.png`)).webp({ quality: 90, alphaQuality: 95 }).toFile(path.join(s03Out, `${name}.webp`));
 }
 await writeFile(path.resolve(here, '../src/three/s03-finegas.json'), await readFile(path.join(assets, 'cutouts/s03_finegas.json'), 'utf8'));
+
+// Scene 04's salmon and the drops of water around him (scripts/s04_layers.py), moved live.
+const s04Out = path.join(out, 's04');
+await mkdir(s04Out, { recursive: true });
+const catchMeta = JSON.parse(await readFile(path.join(assets, 'cutouts/s04_catch.json'), 'utf8'));
+for (const name of ['s04_salmon', ...catchMeta.drops.map((d) => d.name)]) {
+  await sharp(path.join(assets, `cutouts/${name}.png`)).webp({ quality: 90, alphaQuality: 95 }).toFile(path.join(s04Out, `${name.slice(4)}.webp`));
+}
+await writeFile(path.resolve(here, '../src/three/s04-catch.json'), JSON.stringify(catchMeta, null, 2) + '\n');

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { BG } from './scene02.js';
 import finegas from './s03-finegas.json';
+import { ribbon as markRibbon, ringMaterial } from './marks.js';
 
 // Scene 03, on the riverbank above the water: Finegas fishing. The painting is a plate with
 // his rod and line painted out (scripts/s03_plate.py); both are drawn live here, and every
@@ -37,42 +38,9 @@ const COLORS = { rod: new THREE.Color('#dcef36'), line: new THREE.Color('#c8e83d
 
 const toArt = (px, py) => [((px - PW / 2) * D) / PW, ((PH / 2 - py) * D) / PW];
 const rad = THREE.MathUtils.degToRad;
-
 // a flat strip through points (painting px), with a width (px) and opacity along it
-function ribbon(max, material) {
-  const pos = new Float32Array(max * 2 * 3);
-  const col = new Float32Array(max * 2 * 4).fill(1);
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
-  geo.setAttribute('color', new THREE.BufferAttribute(col, 4).setUsage(THREE.DynamicDrawUsage));
-  material.vertexColors = true;
-  const index = [];
-  for (let i = 0; i < max - 1; i++) index.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
-  geo.setIndex(index);
-  const mesh = new THREE.Mesh(geo, material);
-  mesh.frustumCulled = false;
-  function set(pts, width, alpha = () => 1) {
-    const n = pts.length;
-    for (let i = 0; i < n; i++) {
-      const a = pts[Math.max(0, i - 1)];
-      const b = pts[Math.min(n - 1, i + 1)];
-      let tx = b[0] - a[0];
-      let ty = b[1] - a[1];
-      const l = Math.hypot(tx, ty) || 1;
-      tx /= l;
-      ty /= l;
-      const w = width(i / (n - 1)) / 2;
-      const [x1, y1] = toArt(pts[i][0] - ty * w, pts[i][1] + tx * w);
-      const [x2, y2] = toArt(pts[i][0] + ty * w, pts[i][1] - tx * w);
-      pos.set([x1, y1, 0, x2, y2, 0], i * 6);
-      col[i * 8 + 3] = col[i * 8 + 7] = alpha(i / (n - 1));
-    }
-    geo.attributes.color.needsUpdate = true;
-    geo.setDrawRange(0, Math.max(0, (n - 1) * 6));
-    geo.attributes.position.needsUpdate = true;
-  }
-  return { mesh, set };
-}
+const ribbon = (max, material) => markRibbon(max, material, toArt);
+
 
 function rodPoints(hand, th, bend, n = 24) {
   const pts = [[hand[0], hand[1]]];
@@ -283,28 +251,7 @@ export async function loadScene03() {
   art.add(rod.mesh, line.mesh, under.mesh);
 
   // the ring where the line lands, flat on the water
-  const splashMat = new THREE.ShaderMaterial({
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    uniforms: { uAge: { value: 1 }, uStrength: { value: 1 }, uColor: { value: new THREE.Color('#d8f080') } },
-    vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: `
-      varying vec2 vUv;
-      uniform float uAge, uStrength;
-      uniform vec3 uColor;
-      void main() {
-        float r = length((vUv - 0.5) * 2.0);
-        float a = 0.0;
-        for (int i = 0; i < 2; i++) {
-          float t = clamp(uAge - float(i) * 0.2, 0.0, 1.0);
-          float rad = 0.1 + 0.85 * (1.0 - pow(1.0 - t, 2.0));
-          float aa = fwidth(r) * 1.5;
-          a += (1.0 - smoothstep(0.04, 0.04 + aa, abs(r - rad))) * (1.0 - t) * step(0.001, t);
-        }
-        gl_FragColor = vec4(uColor, a * 0.6 * uStrength);
-      }`,
-  });
+  const splashMat = ringMaterial('#d8f080');
   const splash = new THREE.Mesh(new THREE.PlaneGeometry((150 * D) / PW, (34 * D) / PW), splashMat);
   splash.position.z = 0.005;
   splash.visible = false;
@@ -608,5 +555,10 @@ export async function loadScene03() {
     tick,
     // casts now and then only while he's in view and the reader has arrived
     setActive: (on) => (active = on),
+    // where his line goes into the river (group-relative), for the camera to follow it in
+    lineEntry() {
+      const [x, y] = toArt((float ?? REST_FLOAT).x, WATER);
+      return new THREE.Vector3(art.position.x + x * art.scale.x, art.position.y + y * art.scale.y, art.position.z);
+    },
   };
 }
