@@ -1,15 +1,16 @@
 import * as THREE from 'three';
-import { gsap } from 'gsap';
 import { BG } from './scene02.js';
 import finegas from './s03-finegas.json';
 
 // Scene 03, on the riverbank above the water: Finegas fishing. The painting is a plate with
 // his rod and line painted out (scripts/s03_plate.py); both are drawn live here, and every
-// so often he casts: he leans back and lifts his arm, taking the rod back over his shoulder,
-// then drives it forward; the line unrolls out over the river, cuts into the water with a
-// small ring, and stays there, hanging in the water, until he casts again. He's cut into layers for this
+// so often he casts overhead: he lifts the rod, bending his elbow to bring his hand up by
+// his ear and sweep the rod back over his shoulder, waits for the line to straighten out
+// behind, then drives it forward and stops it short, so the rod springs and the line
+// shoots out over the river, cuts into the water with a small ring, and stays there,
+// hanging in the water, until he casts again. He's cut into layers for this
 // (scripts/s03_finegas.py): his legs stay in the painting, his upper body leans from the
-// hips and his arm swings from the shoulder, with the rod in his hand.
+// hips and his arm swings from the shoulder and bends at the elbow, with the rod in his hand.
 //
 // Work is done in the painting's pixels (2912 x 1632, y down) and mapped onto the plate.
 // The plate sits at depth D in front of the camera's rest (cover framing: D units wide at
@@ -21,6 +22,7 @@ const EXT = 1.0; // the plate runs on below the painting (mirrored water, fading
 const WATER_BAND = 0.12; // the share of the painting at its foot that's open water
 const [HIP, SHOULDER] = [finegas.hip, finegas.shoulder];
 const HANDS = { x: 1002, y: 1138 };
+const ELBOW = [946, 1131];
 // the painted rod: leaves his hands at TH degrees, bends BEND along LEN px (fitted)
 const ROD = { th: 53.3, bend: 47.7, len: 780 };
 const WATER = 1302; // the river's surface, in the painting's px
@@ -82,28 +84,53 @@ function rodPoints(hand, th, bend, n = 24) {
 }
 
 // The cast, by time since it began (s). Each pose: the rod's angle at his hands and how
-// much it bends, his arm's swing at the shoulder and his lean at the hips (degrees,
-// anticlockwise on screen: + lifts the arm, + leans him back).
-const REST = { th: ROD.th, bend: ROD.bend, arm: 0, lean: 0 };
-const BACK = { th: 118, bend: 18, arm: 68, lean: 6 }; // hand up by his head, rod over his shoulder
-const FWD = { th: 34, bend: 60, arm: -16, lean: -6 }; // driven forward and down, leaning in
-const inOut = gsap.parseEase('power2.inOut');
-const snap = gsap.parseEase('power2.in');
+// much it bends, his arm's swing at the shoulder, the bend of his elbow and his lean at the
+// hips (degrees, anticlockwise on screen: + swings the elbow forward, + lifts the forearm,
+// + leans him back). The body leads and the rod follows: going forward his shoulder and
+// elbow move before the rod tip, which lags behind, loading the rod.
+const REST = { th: ROD.th, bend: ROD.bend, arm: 0, elbow: 0, lean: 0 };
+const CHANNELS = Object.keys(REST);
+const KEYS = [
+  // t, th, bend, arm, elbow, lean
+  [0.0, ROD.th, ROD.bend, 0, 0, 0],
+  [0.5, 66, 52, 6, 18, 1], // a slow lift, peeling the line off the water
+  [0.86, 110, 24, 26, 50, 4], // the backcast: hand up past his chin, rod swept back
+  [1.0, 122, 12, 30, 58, 6], // the stop, his hand up by his ear
+  [1.18, 124, 18, 31, 59, 6], // drifting a touch while the line straightens out behind
+  [1.34, 116, 36, 26, 52, 3], // forward: body and elbow lead, the rod tip lags
+  [1.5, 80, 66, 11, 26, -4], // the drive, the rod deeply loaded
+  [1.6, 54, 34, 5, 10, -6], // the stop: the rod unloads and the line shoots
+  [1.98, 40, 50, -2, -4, -5], // follow-through, the tip dropping towards the water
+  [3.3, ROD.th, ROD.bend, 0, 0, 0],
+].map(([t, ...v]) => ({ t, v }));
+const STOP = 1.6;
+const CAST_END = KEYS.at(-1).t;
+// smooth through the keys without overshooting them (monotone cubic, Fritsch-Carlson)
+const slopes = CHANNELS.map((_, c) => {
+  const n = KEYS.length;
+  const d = KEYS.slice(1).map((k, i) => (k.v[c] - KEYS[i].v[c]) / (k.t - KEYS[i].t));
+  return KEYS.map((_, i) => (i === 0 || i === n - 1 || d[i - 1] * d[i] <= 0 ? 0 : (2 * d[i - 1] * d[i]) / (d[i - 1] + d[i])));
+});
 const lerp = THREE.MathUtils.lerp;
-const mix = (a, b, e) => Object.fromEntries(Object.keys(a).map((k) => [k, lerp(a[k], b[k], e)]));
 function castPose(t) {
-  if (t < 0.85) return mix(REST, BACK, inOut(t / 0.85)); // back, winding up
-  if (t < 1.0) return BACK;
-  if (t < 1.4) return mix(BACK, FWD, snap((t - 1.0) / 0.4)); // the forward stroke
-  const e = Math.min(1, (t - 1.4) / 1.8); // settling back, the rod springing a little
-  const k = Math.exp(-4.5 * e) * (1 - e);
-  const body = 1 - inOut(e); // his body eases back without the spring
-  return {
-    th: REST.th + (FWD.th - REST.th) * k * Math.cos(9 * e),
-    bend: REST.bend + (FWD.bend - REST.bend) * k * Math.cos(11 * e),
-    arm: FWD.arm * body,
-    lean: FWD.lean * body,
-  };
+  if (t >= CAST_END) return REST;
+  let i = 0;
+  while (KEYS[i + 1].t < t) i++;
+  const [a, b] = [KEYS[i], KEYS[i + 1]];
+  const h = b.t - a.t;
+  const x = (t - a.t) / h;
+  const [h00, h10, h01, h11] = [2 * x ** 3 - 3 * x ** 2 + 1, x ** 3 - 2 * x ** 2 + x, -2 * x ** 3 + 3 * x ** 2, x ** 3 - x ** 2];
+  const pose = Object.fromEntries(
+    CHANNELS.map((k, c) => [k, h00 * a.v[c] + h10 * h * slopes[c][i] + h01 * b.v[c] + h11 * h * slopes[c][i + 1]]),
+  );
+  if (t > STOP) {
+    // after the stop the rod springs back and forth a few times as it settles
+    const e = t - STOP;
+    const k = Math.exp(-5 * e);
+    pose.bend += 16 * k * Math.sin(24 * e);
+    pose.th += 3 * k * Math.sin(24 * e + 0.6);
+  }
+  return pose;
 }
 
 // a point turned about a pivot (painting px, y down) by deg anticlockwise on screen
@@ -113,7 +140,7 @@ function turn([x, y], [px, py], deg) {
   const dy = py - y;
   return [px + dx * Math.cos(a) - dy * Math.sin(a), py - (dx * Math.sin(a) + dy * Math.cos(a))];
 }
-const handAt = (pose) => turn(turn([HANDS.x, HANDS.y], SHOULDER, pose.arm), HIP, pose.lean);
+const handAt = (pose) => turn(turn(turn([HANDS.x, HANDS.y], ELBOW, pose.elbow), SHOULDER, pose.arm), HIP, pose.lean);
 
 export async function loadScene03() {
   const [tex, waterTex] = await Promise.all([
@@ -129,7 +156,8 @@ export async function loadScene03() {
   group.add(art);
 
   // the plate, running on below the painting: just its water band, mirrored and stretched,
-  // fading to the dark of scene 02's depths, so the rise up through the surface has no edge
+  // fading to scene 02's water and then away into it, so the rise up through the surface
+  // has no edge
   const h = (D * PH) / PW;
   const geom = new THREE.PlaneGeometry(D, h * (1 + EXT), 1, 24);
   geom.translate(0, (-h * EXT) / 2, 0);
@@ -140,11 +168,11 @@ export async function loadScene03() {
     const below = v;
     if (v < 0) v = (v / EXT) * WATER_BAND; // below the foot: only the bottom water band, mirrored
     uv.setY(i, v);
-    const k = 1 - THREE.MathUtils.smoothstep(-below, 0.0, 0.14); // the painting's foot melts into the dark
-    colors.push(k, k, k);
+    const k = 1 - THREE.MathUtils.smoothstep(-below, 0.0, 0.14); // the painting's foot melts into the water
+    colors.push(k, k, k, THREE.MathUtils.smoothstep(below, -EXT, -EXT * 0.55)); // and fades out lower down
   }
-  geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  const plateMat = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true });
+  geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
+  const plateMat = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, transparent: true });
   // The river moves: below the surface the painting sways a little from side to side and
   // its stripes undulate, more towards the front than out by the far bank, with a faint
   // shimmer. A mask (scripts/s03_water.py) keeps the banks still, and no bank pixel is
@@ -170,7 +198,7 @@ export async function loadScene03() {
         diffuseColor.rgb *= 1.0 + 0.06 * wet * sin(wuv.x * 38.0 + py * 0.3 + uTime * 0.7);
         `,
       )
-      .replace('#include <color_fragment>', 'diffuseColor.rgb = mix(uBg, diffuseColor.rgb, vColor.r);');
+      .replace('#include <color_fragment>', 'diffuseColor.rgb = mix(uBg, diffuseColor.rgb, vColor.r);\ndiffuseColor.a *= vColor.a;');
   };
   const plate = new THREE.Mesh(geom, plateMat);
   art.add(plate);
@@ -201,8 +229,37 @@ export async function loadScene03() {
   const [sx, sy] = toArt(...SHOULDER);
   const [hx, hy] = toArt(...HIP);
   arm.position.set(sx - hx, sy - hy, 0.002);
-  arm.add(sprite(armTex, finegas.layers.arm, SHOULDER, 5));
+  const sleeve = sprite(armTex, finegas.layers.arm, SHOULDER, 5);
+  arm.add(sleeve);
   body.add(arm);
+  // His elbow bends: the sleeve is a fine mesh whose forearm turns about the elbow, blending
+  // into the upper arm over the first stretch of the forearm (each point weighted by how far
+  // along the forearm it lies), so the crease stays soft and the sleeve bunched under the
+  // elbow stays with it.
+  const ab = finegas.layers.arm;
+  sleeve.geometry.dispose();
+  sleeve.geometry = new THREE.PlaneGeometry((ab.w * D) / PW, (ab.h * D) / PW, 24, 24);
+  const toSleeve = ([px, py]) => [((px - ab.x - ab.w / 2) * D) / PW, ((ab.y + ab.h / 2 - py) * D) / PW];
+  const sleevePos = sleeve.geometry.attributes.position;
+  const sleeveRest = Float32Array.from(sleevePos.array);
+  const fl = Math.hypot(HANDS.x - ELBOW[0], HANDS.y - ELBOW[1]);
+  const fore = [(HANDS.x - ELBOW[0]) / fl, (HANDS.y - ELBOW[1]) / fl];
+  const sleeveW = Array.from({ length: sleevePos.count }, (_, i) => {
+    const px = ab.x + ab.w / 2 + (sleeveRest[i * 3] * PW) / D - ELBOW[0];
+    const py = ab.y + ab.h / 2 - (sleeveRest[i * 3 + 1] * PW) / D - ELBOW[1];
+    return THREE.MathUtils.smoothstep(px * fore[0] + py * fore[1], 4, 24); // px along the forearm
+  });
+  const [elx, ely] = toSleeve(ELBOW);
+  function bendElbow(deg) {
+    const [c, sn] = [Math.cos(rad(deg)), Math.sin(rad(deg))];
+    for (let i = 0; i < sleevePos.count; i++) {
+      const x = sleeveRest[i * 3] - elx;
+      const y = sleeveRest[i * 3 + 1] - ely;
+      const w = sleeveW[i];
+      sleevePos.setXY(i, elx + x + w * (x * c - y * sn - x), ely + y + w * (x * sn + y * c - y));
+    }
+    sleevePos.needsUpdate = true;
+  }
   art.add(body);
 
   const strip = (color, opacity) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide });
@@ -319,10 +376,11 @@ export async function loadScene03() {
       castT += dt;
       pose = castPose(castT);
       if (castT > 0.05 && float && castT < 1) float = null; // the line lifts off the water
-      if (castT > 3.4) castT = -1;
+      if (castT > CAST_END) castT = -1;
     }
     body.rotation.z = rad(pose.lean);
     arm.rotation.z = rad(pose.arm);
+    bendElbow(pose.elbow);
     const pts = rodPoints(handAt(pose), pose.th, pose.bend);
     tip = pts.at(-1);
     rod.set(pts, (f) => lerp(7, 2.4, f));
@@ -331,7 +389,7 @@ export async function loadScene03() {
     const steps = Math.max(1, Math.ceil(dt * 240));
     for (let i = 0; i < steps; i++) stepLine(dt / steps);
     const end = P[LINE.n];
-    if (!float && castT > 1.1 && end[1] >= WATER) {
+    if (!float && castT > STOP && end[1] >= WATER) {
       float = { x: end[0] - 25, y: WATER + SINK }; // it cuts in, and its end settles below
       if (import.meta.env.DEV) window.__cast = { landed: Math.round(end[0]) };
       splash.position.set(...toArt(end[0], WATER), 0.005);

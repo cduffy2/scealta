@@ -121,6 +121,17 @@
   height: 100%;
   object-fit: cover;
 }
+/* scene 02's water, as in 3D (src/three/scene02.js): lightens only the painting's dark,
+   peaty green deepening downwards, with faint shafts of light from the surface */
+#scene-02 picture::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: lighten;
+  background:
+    repeating-linear-gradient(105deg, rgb(214 232 168 / 0) 0 9vw, rgb(214 232 168 / 0.05) 12vw, rgb(214 232 168 / 0) 15vw 23vw),
+    linear-gradient(180deg, #163020 0%, #10241a 45%, #040c07 100%);
+}
 .scene__scrim {
   position: absolute;
   inset: 0;
