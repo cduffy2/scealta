@@ -23,7 +23,8 @@ const WATER_BAND = 0.12; // the share of the painting at its foot that's open wa
 const [HIP, SHOULDER] = [finegas.hip, finegas.shoulder];
 const HANDS = { x: 1002, y: 1138 };
 const ELBOW = [946, 1131];
-// the painted rod: leaves his hands at TH degrees, bends BEND along LEN px (fitted)
+// the rod: leaves his hands at TH degrees, bends BEND along LEN px (fitted to the painted
+// one, then made a little shorter)
 const ROD = { th: 53.3, bend: 47.7, len: 680 };
 const WATER = 1302; // the river's surface, in the painting's px
 const LAND_MAX = 1880; // past this the far bank's grass covers the water
