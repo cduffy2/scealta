@@ -56,11 +56,13 @@ const RISE = [6.4, 8.0];
 const TEXT3_IN = [8.2, 8.6];
 const DIVE4 = [9.2, 10.8];
 const TEXT4_IN = [11.0, 11.4];
-const CATCH_GAP = 4; // how far past the river's surface the camera comes to rest in scene 04
+// Scene 04 opens out of scene 03's river at this size, just in front of it, so the camera
+// keeps coming in at the same pace and the catch is as near as the river was
+const CATCH_K = 0.45;
+const REVEAL4 = [0.25, 0.8]; // share of the way in over which it opens out
 const RISE_Y = 13; // how far up the river is from the camera's rest under the pool
 const END_Z = -PLATE_DEPTH - 3; // the camera's rest under the water
 const SURFACE = new THREE.Color('#2c5a1a');
-const RIVER_WASH = new THREE.Color('#4a5c12'); // going in through the river, towards the catch's gold
 const WELL = new THREE.Color('#9cc23a');
 
 const easeIO = gsap.parseEase('power2.inOut');
@@ -279,16 +281,22 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     );
     // the river's surface in scene 03 (its painting), which the way in to scene 04 goes through
     const riverZ = scene03.group.position.z + scene03.lineEntry().z;
+    const reveal4 = smoothstep(REVEAL4[0], REVEAL4[1], dive4);
     if (dive4 > 0) {
-      // in along Finegas's line: towards where it goes into the river, and on through
+      // in along Finegas's line, towards where it goes into the river: the catch opens out
+      // from there, the salmon breaking the water where the line went in, and the camera
+      // comes to rest framing it
       entry ??= scene03.lineEntry().add(scene03.group.position);
-      const g = smoothstep(0, 0.7, dive4);
+      const at = scene04.focus().multiplyScalar(CATCH_K);
+      scene04.group.scale.setScalar(CATCH_K);
+      scene04.group.position.set(entry.x - at.x, entry.y - at.y, riverZ + 0.03 - at.z);
+      scene04.setReveal(reveal4);
+      const g = smoothstep(0, 0.8, dive4);
       camera.position.set(
-        THREE.MathUtils.lerp(geo.pool.x, entry.x, g),
-        THREE.MathUtils.lerp(geo.pool.y + RISE_Y, entry.y, g),
-        THREE.MathUtils.lerp(END_Z, riverZ - CATCH_GAP, easeIO(dive4)),
+        THREE.MathUtils.lerp(geo.pool.x, scene04.group.position.x, g),
+        THREE.MathUtils.lerp(geo.pool.y + RISE_Y, scene04.group.position.y, g),
+        THREE.MathUtils.lerp(END_Z, scene04.group.position.z, easeIO(dive4)),
       );
-      scene04.group.position.set(entry.x, entry.y, riverZ - CATCH_GAP);
     } else if (rise > 0) {
       entry = null;
       camera.position.set(geo.pool.x, geo.pool.y + RISE_Y * easeIO(rise), END_Z);
@@ -325,15 +333,10 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     scene02.setRiver(smoothstep(0.05, 0.75, rise)); // the water takes on the river's green as you come up
     // the water's surface: a wash as the camera plunges through the pool (coming up into
     // scene 03 needs none: the river fades into the water below it)
-    // and going in through the river towards the catch (scene 04)
-    surface.material.opacity = Math.max(
-      1 - smoothstep(0.15, 2.4, Math.abs(z + PLATE_DEPTH)),
-      dive4 > 0 ? 1 - smoothstep(0.1, 2.0, Math.abs(z - riverZ)) : 0,
-    );
-    surface.material.color.copy(dive4 > 0 ? RIVER_WASH : SURFACE);
-    scene03.group.visible = rise > 0 && z > riverZ - 0.05;
-    if (dive4 > 0) scene02.group.visible = scene02.front.visible = false; // its water would hide the catch
-    scene04.group.visible = dive4 > 0 && z < riverZ + 1;
+    surface.material.opacity = 1 - smoothstep(0.15, 2.4, Math.abs(z + PLATE_DEPTH));
+    scene03.group.visible = rise > 0 && reveal4 < 1;
+    if (dive4 > 0) scene02.group.visible = scene02.front.visible = false; // its water would cover the catch
+    scene04.group.visible = reveal4 > 0;
     scene03.setActive(u >= TEXT3_IN[0] && dive4 === 0); // Finegas casts now and then once you've arrived
     fish.under = dive > 0;
     // in from the right, then off to the left as the camera rises

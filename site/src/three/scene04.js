@@ -12,17 +12,23 @@ import { ribbon as markRibbon, ringMaterial } from './marks.js';
 // Work is done in the painting's pixels (2912 x 1632, y down), mapped onto a plate D units
 // wide at depth D in front of the camera's rest (cover framing, like scene 03). On portrait
 // screens it's shown across the top half, the salmon in view (Figma: Mobile 04).
+//
+// It opens out of scene 03, from where Finegas's line goes into the river (setReveal): a
+// widening circle around where the salmon breaks the water (FOCUS), the rest following.
 
 const D = 14;
 const EXT = 0.35; // how far the plate runs on past each edge, mirrored (share of its size)
+const FOOT = 1; // and below its foot, where it's the night (on phones the text sits there)
 const [PW, PH] = meta.size;
 const WATER = meta.water;
 const MOUTH = meta.mouth;
 const FISH = meta.salmon; // his box
+const FOCUS = [2275, WATER]; // where he breaks the water: the catch opens out from here
 const toArt = (px, py) => [((px - PW / 2) * D) / PW, ((PH / 2 - py) * D) / PW];
 const ribbon = (max, material) => markRibbon(max, material, toArt);
 const lerp = THREE.MathUtils.lerp;
 const rand = (a, b) => a + Math.random() * (b - a);
+const OVER = 10; // drawn after scene 03 (render order), which it opens out over
 const G = 900; // px/s²: the drops fall a little slowly, so the eye can follow them
 // the left edge of his body, roughly, where the drops come off (y -> x)
 const leftEdge = (y) => lerp(2120, 2214, THREE.MathUtils.clamp((y - 820) / 420, 0, 1));
@@ -50,10 +56,11 @@ export async function loadScene04() {
   // The plate. Below the water's edge the stripes sway and shimmer, and the gold under him
   // swells and fades as he strains.
   const glowU = { value: 0 };
-  const plateMat = new THREE.MeshBasicMaterial({ map: plateTex });
+  const revealU = { value: 1 };
+  const plateMat = new THREE.MeshBasicMaterial({ map: plateTex, transparent: true, depthWrite: false });
   plateMat.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, { uTime: timeU, uGlow: glowU });
-    shader.fragmentShader = `uniform float uTime;\nuniform float uGlow;\n${shader.fragmentShader}`.replace(
+    Object.assign(shader.uniforms, { uTime: timeU, uGlow: glowU, uReveal: revealU });
+    shader.fragmentShader = `uniform float uTime;\nuniform float uGlow;\nuniform float uReveal;\n${shader.fragmentShader}`.replace(
       '#include <map_fragment>',
       `
       vec2 wuv = vMapUv;
@@ -71,16 +78,29 @@ export async function loadScene04() {
       diffuseColor.rgb *= 1.0 + wet * uGlow * exp(-fx * fx) * exp(-below / 0.03);
       // past the painting's foot it fades to the night (on phones the text sits there)
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.012, 0.035, 0.012), smoothstep(0.0, 0.08, -wuv.y));
+      // opening out from where he is (painting px from FOCUS), softly
+      float far = length((wuv - vec2(${(FOCUS[0] / PW).toFixed(4)}, ${(1 - FOCUS[1] / PH).toFixed(4)})) * vec2(${PW}.0, ${PH}.0));
+      float reach = uReveal * 4500.0;
+      diffuseColor.a *= uReveal >= 1.0 ? 1.0 : 1.0 - smoothstep(reach * 0.45, reach, far);
+      // and towards the painting's sides and top, and past its foot, it stays clear until
+      // it has (no frame over the river, no mirrored moon)
+      float clear = max(
+        smoothstep(-0.15, 0.12, max(max(-wuv.x, wuv.x - 1.0), wuv.y - 1.0)),
+        smoothstep(0.02, 0.25, -wuv.y)
+      );
+      diffuseColor.a *= 1.0 - clear * (1.0 - smoothstep(0.8, 1.0, uReveal));
       `,
     );
   };
   // It runs on past its edges, mirrored (the night and the water carry on), so its frame
   // never shows while the camera is still on its way in.
   plateTex.wrapS = plateTex.wrapT = THREE.MirroredRepeatWrapping;
-  const plateGeo = new THREE.PlaneGeometry(D * (1 + 2 * EXT), ((D * PH) / PW) * (1 + 2 * EXT));
+  const plateGeo = new THREE.PlaneGeometry(D * (1 + 2 * EXT), ((D * PH) / PW) * (1 + EXT + FOOT));
+  plateGeo.translate(0, (((D * PH) / PW) * (EXT - FOOT)) / 2, 0);
   const uv = plateGeo.attributes.uv;
-  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (1 + 2 * EXT) - EXT, uv.getY(i) * (1 + 2 * EXT) - EXT);
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (1 + 2 * EXT) - EXT, uv.getY(i) * (1 + EXT + FOOT) - FOOT);
   const plate = new THREE.Mesh(plateGeo, plateMat);
+  plate.renderOrder = OVER;
   art.add(plate);
 
   // the moon, glowing faintly
@@ -102,16 +122,15 @@ export async function loadScene04() {
   });
   const moon = new THREE.Mesh(new THREE.PlaneGeometry((mr * 9 * D) / PW, (mr * 9 * D) / PW), moonMat);
   moon.position.set(...toArt(mx, my), 0.002);
+  moon.renderOrder = OVER + 1;
   art.add(moon);
 
   // The salmon: a fine mesh that bends, fixed where he leaves the water and swinging more
   // towards his head, which lifts a little as the line pulls.
-  const fish = new THREE.Mesh(
-    new THREE.PlaneGeometry((FISH.w * D) / PW, (FISH.h * D) / PW, 12, 40),
-    new THREE.MeshBasicMaterial({ map: fishTex, transparent: true, depthWrite: false }),
-  );
+  const fishMat = new THREE.MeshBasicMaterial({ map: fishTex, transparent: true, depthWrite: false });
+  const fish = new THREE.Mesh(new THREE.PlaneGeometry((FISH.w * D) / PW, (FISH.h * D) / PW, 12, 40), fishMat);
   fish.position.set(...toArt(FISH.x + FISH.w / 2, FISH.y + FISH.h / 2), 0.006);
-  fish.renderOrder = 3;
+  fish.renderOrder = OVER + 3;
   art.add(fish);
   const fishPos = fish.geometry.attributes.position;
   const fishRest = Float32Array.from(fishPos.array);
@@ -159,7 +178,7 @@ export async function loadScene04() {
   };
   const line = ribbon(34, new THREE.MeshBasicMaterial({ color: '#d6d04a', transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }));
   line.mesh.position.z = 0.004;
-  line.mesh.renderOrder = 2; // under his jaw
+  line.mesh.renderOrder = OVER + 2; // under his jaw
   art.add(line.mesh);
   function drawLine(hard) {
     const [dx, dy] = bend(MOUTH[1]);
@@ -177,16 +196,16 @@ export async function loadScene04() {
   const rings = Array.from({ length: 8 }, () => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry((150 * D) / PW, (34 * D) / PW), ringMaterial('#ffcf5a'));
     m.position.z = 0.003;
+    m.renderOrder = OVER + 1;
     m.visible = false;
     art.add(m);
-    return { m, age: 1, life: 1 };
+    return { m, age: 1, life: 1, strength: 0 };
   });
   function ring(x, scale, strength, life) {
     const r = rings.find((q) => q.age >= 1) ?? rings[0];
     r.m.position.set(...toArt(x, WATER + 2), 0.003);
     r.m.scale.setScalar(scale);
-    r.m.material.uniforms.uStrength.value = strength;
-    Object.assign(r, { age: 0, life });
+    Object.assign(r, { age: 0, life, strength });
   }
   let swellT = 0.5; // seconds to the next wide ripple from where he is
 
@@ -196,7 +215,7 @@ export async function loadScene04() {
       new THREE.PlaneGeometry((d.w * D) / PW, (d.h * D) / PW),
       new THREE.MeshBasicMaterial({ map: dropTex[i], transparent: true, depthWrite: false }),
     );
-    m.renderOrder = 4;
+    m.renderOrder = OVER + 4;
     art.add(m);
     return { m, w: d.w, on: true, x: d.x + d.w / 2, y: d.y + d.h / 2, vx: 0, vy: 0, spin: rand(-1, 1), age: 1 };
   });
@@ -236,8 +255,20 @@ export async function loadScene04() {
       }
       d.m.position.set(...toArt(d.x, d.y), 0.008);
       d.m.rotation.z += d.spin * dt;
-      d.m.material.opacity = Math.min(1, d.age / 0.12);
+      d.m.material.opacity = Math.min(1, d.age / 0.12) * shown;
     }
+  }
+
+  // how far the catch has opened out of scene 03 (0 -> 1); what moves on it comes in with
+  // the circle, the moon (far to his left) last
+  let shown = 1;
+  let moonShown = 1;
+  function setReveal(r) {
+    revealU.value = r;
+    shown = THREE.MathUtils.smoothstep(r, 0.08, 0.3);
+    moonShown = THREE.MathUtils.smoothstep(r, 0.8, 1);
+    fishMat.opacity = shown;
+    line.mesh.material.opacity = 0.95 * shown;
   }
 
   function tick(dt) {
@@ -254,8 +285,9 @@ export async function loadScene04() {
       if (r.age < 1) r.age = Math.min(1, r.age + dt / r.life);
       r.m.visible = r.age < 1;
       r.m.material.uniforms.uAge.value = r.age;
+      r.m.material.uniforms.uStrength.value = r.strength * shown;
     }
-    moonMat.uniforms.uK.value = 0.32 + 0.08 * Math.sin(time * 0.5);
+    moonMat.uniforms.uK.value = (0.32 + 0.08 * Math.sin(time * 0.5)) * moonShown;
   }
 
   // view: the view's width and height per unit depth at the camera's rest
@@ -273,5 +305,15 @@ export async function loadScene04() {
   }
 
   tick(0);
-  return { group, layout, tick };
+  return {
+    group,
+    layout,
+    tick,
+    setReveal,
+    // where he breaks the water, in the group's space (it opens out from here)
+    focus() {
+      const [x, y] = toArt(...FOCUS);
+      return new THREE.Vector3(art.position.x + x * art.scale.x, art.position.y + y * art.scale.y, art.position.z);
+    },
+  };
 }
