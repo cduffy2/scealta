@@ -8,8 +8,9 @@ import meta from './s05-fire.json';
 // new place, a new time), so the trees and the night lag behind the fire; at rest they line
 // up as painted. Here Fionn's hand reaches in from the right and now and then prods the
 // salmon with his stick, the salmon cooks slowly to a golden brown, the flames flicker,
-// embers drift up from the fire and fade, now and then a blister swells on his skin and
-// bursts, the stars twinkle, the trees stir and the water sways.
+// smoke rises off him and the heat shimmers over the trees, now and then a blister swells
+// on his skin and bursts, the stars twinkle, a star shoots now and then, bats flit over the
+// trees, the trees stir and the water sways.
 //
 // Work is done in the painting's pixels (2912 x 1632, y down), mapped onto a plate D units
 // wide at depth D in front of the camera's rest (cover framing, like scene 04); the far
@@ -32,6 +33,11 @@ const DEPTH = { sky: 1.5, trees: 1.18, near: 1 };
 const GRILL = [1122, 1370, 2762]; // x0, top, x1 of the grill (it stands still in the water)
 const NIGHT = 'vec3(0.012, 0.035, 0.012)';
 const COOK = 30; // seconds for him to cook through
+// where the heat shimmers over the trees: x0, x1 (over him), and y where it starts and is
+// at its strongest (his back)
+const HAZE = [1330, 2560, 430, 960];
+// the smoke off him: its box, its foot hidden behind his back
+const SMOKE = [1330, 2560, 330, 1120];
 
 // a soft round light, uK its strength
 const glow = (color, falloff = 2.0) =>
@@ -59,14 +65,13 @@ export async function loadScene05() {
     return t;
   };
   const size = window.innerWidth < 1000 ? 1600 : 2912;
-  const [skyTex, treesTex, nearTex, flamesTex, fishTex, handTex, ...emberTex] = await Promise.all([
+  const [skyTex, treesTex, nearTex, flamesTex, fishTex, handTex] = await Promise.all([
     load(`/images/s05/sky-${size}.webp`),
     load(`/images/s05/trees-${size}.webp`),
     load(`/images/s05/near-${size}.webp`),
     load('/images/s05/flames.webp', false),
     load('/images/s05/fish.webp', false),
     load('/images/s05/hand.webp'),
-    ...meta.embers.map((e) => load(`/images/s05/${e.name.slice(4)}.webp`)),
   ]);
 
   const group = new THREE.Group();
@@ -122,7 +127,8 @@ export async function loadScene05() {
   );
 
   // The trees: they stir in slow, broad waves, as if in a light breeze (their tops too),
-  // and now and then a few of their dashes catch the firelight.
+  // and now and then a few of their dashes catch the firelight. Over the salmon the heat
+  // off the fire makes them shimmer, in ripples rising, strongest just above him.
   layers.trees.add(
     plate(
       treesTex,
@@ -132,6 +138,13 @@ export async function loadScene05() {
         sin(py * 0.02 + wuv.x * 3.0 - uTime * 0.5) * 0.0008 + sin(py * 0.007 - wuv.x * 1.7 - uTime * 0.23) * 0.0006,
         sin(wuv.x * 9.0 - uTime * 0.4) * 0.0006
       ) * (0.4 + 0.6 * fromTop);
+      float yd = ${PH}.0 - py; // painting px down from its top
+      float heat = smoothstep(${HAZE[0] - 120}.0, ${HAZE[0] + 80}.0, wuv.x * ${PW}.0) * (1.0 - smoothstep(${HAZE[1] - 80}.0, ${HAZE[1] + 120}.0, wuv.x * ${PW}.0))
+        * smoothstep(${HAZE[2]}.0, ${HAZE[3]}.0, yd);
+      off += vec2(
+        sin(yd * 0.045 + uTime * 5.0 + wuv.x * 37.0) * 0.0011 + sin(yd * 0.11 + uTime * 8.3 - wuv.x * 61.0) * 0.0005,
+        sin(wuv.x * 90.0 + yd * 0.03 + uTime * 4.1) * 0.0007
+      ) * heat;
       vec4 texel = texture2D(map, wuv + off);
       diffuseColor *= texel;
       float lum = dot(texel.rgb, vec3(0.3, 0.59, 0.11));
@@ -374,50 +387,201 @@ export async function loadScene05() {
     smear.material.uniforms.uK.value = 0.7 * (1 - smooth(smearAge, 0.25, 1));
   }
 
-  // The embers: the painted ones drift on up and fade; then more keep rising from the fire,
-  // from behind him, each glowing faintly.
-  const embers = meta.embers.map((e, i) => {
-    const m = new THREE.Mesh(
-      new THREE.PlaneGeometry((e.w * D) / PW, (e.h * D) / PW),
-      new THREE.MeshBasicMaterial({ map: emberTex[i], transparent: true, depthWrite: false }),
-    );
-    m.renderOrder = UNDER + 6;
-    const light = new THREE.Mesh(new THREE.PlaneGeometry((e.w * 2.6 * D) / PW, (e.w * 2.6 * D) / PW), glow('1.0, 0.55, 0.2', 1.6));
-    light.renderOrder = UNDER + 5;
-    near.add(m, light);
-    const y = e.y + e.h / 2;
-    return { m, light, x: e.x + e.w / 2, y, x0: e.x + e.w / 2, top: y - rand(260, 420), vy: -rand(45, 80), age: 1, phase: rand(0, 6), wait: 0 };
+  // The smoke: pale wisps rise off him from behind his back, curling and leaning as they go,
+  // spreading and thinning out above the trees; warm with the firelight low down.
+  const NOISE = `
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float noise(vec2 p) {
+      vec2 i = floor(p), f = fract(p);
+      f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+    }
+    float fbm(vec2 p) {
+      float v = 0.0, a = 0.5;
+      for (int i = 0; i < 4; i++) { v += a * noise(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; }
+      return v;
+    }`;
+  const smokeMat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    uniforms: { uTime: timeU, uK: { value: 0 } },
+    vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `
+      varying vec2 vUv;
+      uniform float uTime;
+      uniform float uK;
+      ${NOISE}
+      void main() {
+        float w = ${((SMOKE[1] - SMOKE[0]) / (SMOKE[3] - SMOKE[2])).toFixed(3)}; // its width per height
+        vec2 p = vec2(vUv.x * w, vUv.y) * 3.2;
+        // it rises, sways and leans a little to the left as it goes
+        vec2 q = p - vec2(0.5 * sin(vUv.y * 2.5 + uTime * 0.25) + 0.9 * vUv.y, uTime * 0.32);
+        float n = fbm(q + 1.4 * fbm(q * 0.8 + vec2(0.0, -uTime * 0.12)));
+        // in a few wisps off his back, which spread into one another as they rise
+        float wisps = 0.5 + 0.5 * sin(vUv.x * 21.0 + 3.0 * fbm(vec2(vUv.x * 4.0, vUv.y * 2.0 - uTime * 0.2)));
+        float body = smoothstep(0.36, 0.74, n) * mix(wisps, 1.0, smoothstep(0.1, 0.6, vUv.y));
+        float fade = smoothstep(0.08, 0.3, vUv.y) * (1.0 - smoothstep(0.35, 1.0, vUv.y))
+          * smoothstep(0.0, 0.14, vUv.x) * (1.0 - smoothstep(0.86, 1.0, vUv.x));
+        vec3 c = mix(vec3(1.0, 0.72, 0.45), vec3(0.78, 0.8, 0.74), smoothstep(0.15, 0.5, vUv.y));
+        gl_FragColor = vec4(c, body * fade * 0.55 * uK);
+      }`,
   });
-  function rise(dt) {
-    for (const e of embers) {
-      if (e.wait > 0) {
-        e.wait -= dt;
-        e.m.visible = e.light.visible = false;
-        if (e.wait <= 0) {
-          // from the fire, up from behind him
-          e.x = e.x0 = rand(1392, 2432);
-          e.y = rand(980, 1020);
-          e.top = rand(470, 700);
-          e.vy = -rand(45, 85);
-          e.age = 0;
-        }
+  const smoke = new THREE.Mesh(new THREE.PlaneGeometry(((SMOKE[1] - SMOKE[0]) * D) / PW, ((SMOKE[3] - SMOKE[2]) * D) / PW), smokeMat);
+  smoke.position.set(...toArt((SMOKE[0] + SMOKE[1]) / 2, (SMOKE[2] + SMOKE[3]) / 2), -0.002);
+  smoke.renderOrder = UNDER + 1.9; // behind him (the near plate): it rises from behind his back
+  near.add(smoke);
+
+  // A shooting star, now and then: a quick bright streak down across the night, its tail
+  // trailing and fading, gone behind the trees or into the dark.
+  const starMat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: { uK: { value: 0 } },
+    vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `
+      varying vec2 vUv;
+      uniform float uK;
+      void main() {
+        float y = (vUv.y - 0.5) * 2.0;
+        float thick = 0.15 + 0.6 * vUv.x; // thin at the tail's end
+        float tail = pow(vUv.x, 2.2) * exp(-y * y / (thick * thick) * 3.0);
+        vec2 h = vec2((vUv.x - 0.96) * 14.0, y);
+        float head = exp(-dot(h, h) * 2.5);
+        gl_FragColor = vec4(vec3(1.0, 0.95, 0.8) * (tail * 0.9 + head * 1.4), 1.0) * uK;
+      }`,
+  });
+  const STAR_LEN = 440; // px
+  const starGeo = new THREE.PlaneGeometry(1, 1);
+  starGeo.translate(-0.46, 0, 0); // about its head
+  const star = new THREE.Mesh(starGeo, starMat);
+  star.renderOrder = UNDER + 0.5;
+  star.visible = false;
+  layers.sky.add(star);
+  const shooting = { t: 5, on: false, age: 0, life: 1, x: 0, y: 0, vx: 0, vy: 0 };
+  function shoot(dt) {
+    const o = shooting;
+    if (!o.on && (o.t -= dt) <= 0) {
+      // high in the night, over the trees on his side or the middle, down to either side
+      const side = Math.random() < 0.6 ? -1 : 1;
+      const a = rand(0.28, 0.6);
+      const v = rand(1300, 1800);
+      Object.assign(o, { on: true, age: 0, life: rand(0.6, 0.9), x: rand(1100, 2700), y: rand(40, 220), vx: side * Math.cos(a) * v, vy: Math.sin(a) * v });
+    }
+    star.visible = o.on;
+    if (!o.on) return;
+    o.age += dt;
+    o.x += o.vx * dt;
+    o.y += o.vy * dt;
+    if (o.age >= o.life) {
+      o.on = star.visible = false;
+      o.t = rand(9, 16);
+      return;
+    }
+    const k = o.age / o.life;
+    // the tail grows out behind it, then all of it fades
+    const len = STAR_LEN * Math.min(1, k * 3);
+    star.position.set(...toArt(o.x, o.y), 0.002);
+    star.rotation.z = Math.atan2(-o.vy, o.vx);
+    star.scale.set((len * D) / PW, (9 * D) / PW, 1);
+    starMat.uniforms.uK.value = smooth(k, 0, 0.12) * (1 - smooth(k, 0.6, 1));
+  }
+
+  // Bats: now and then two flit over the trees, quick and jinking, wings flapping, dark
+  // against the night with a thin warm edge from the fire (the painting's outlines).
+  const FRAMES = 8;
+  const FW = 128;
+  const atlas = document.createElement('canvas');
+  atlas.width = FW * FRAMES;
+  atlas.height = 64;
+  const ctx = atlas.getContext('2d');
+  for (let i = 0; i < FRAMES; i++) {
+    const flap = Math.cos((i / FRAMES) * Math.PI * 2); // 1 up, -1 down
+    const cx = i * FW + FW / 2;
+    const cy = 32;
+    ctx.beginPath();
+    for (const s of [-1, 1]) {
+      const tip = [cx + s * 56, cy - 2 - flap * 22];
+      const hip = [cx + s * 5, cy + 9];
+      ctx.moveTo(cx + s * 4, cy - 4);
+      // the leading edge, out to the wing's tip by its elbow
+      ctx.quadraticCurveTo(cx + s * 30, cy - 8 - flap * 18, ...tip);
+      // the trailing edge, scalloped between its fingers, back to his hip
+      for (let j = 1; j <= 3; j++) {
+        const t = j / 3;
+        const px = tip[0] + (hip[0] - tip[0]) * t;
+        const py = tip[1] + (hip[1] - tip[1]) * t;
+        const mx = tip[0] + (hip[0] - tip[0]) * (t - 1 / 6);
+        const my = tip[1] + (hip[1] - tip[1]) * (t - 1 / 6) - 7;
+        ctx.quadraticCurveTo(mx, my, px, py);
+      }
+      ctx.closePath();
+    }
+    ctx.ellipse(cx, cy + 2, 6, 10, 0, 0, Math.PI * 2);
+    ctx.moveTo(cx - 6, cy - 6);
+    ctx.lineTo(cx - 5, cy - 15);
+    ctx.lineTo(cx - 1, cy - 9);
+    ctx.lineTo(cx + 1, cy - 9);
+    ctx.lineTo(cx + 5, cy - 15);
+    ctx.lineTo(cx + 6, cy - 6);
+    ctx.closePath();
+    ctx.fillStyle = '#0a110b';
+    ctx.strokeStyle = 'rgba(232, 150, 72, 0.75)';
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    ctx.fill();
+  }
+  const batTex = new THREE.CanvasTexture(atlas);
+  batTex.colorSpace = THREE.SRGBColorSpace;
+  batTex.repeat.set(1 / FRAMES, 1);
+  const BAT_W = 112; // px, the frame's width (his wingspan a little less)
+  const bats = Array.from({ length: 2 }, () => {
+    const tex = batTex.clone();
+    tex.needsUpdate = true;
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry((BAT_W * D) / PW, ((BAT_W / 2) * D) / PW),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }),
+    );
+    m.renderOrder = UNDER + 1.5;
+    m.visible = false;
+    layers.trees.add(m);
+    return { m, tex, on: false, age: 0, x0: 0, y0: 0, dir: 1, v: 0, ph: 0, flap: 0, rate: 0, x: 0, y: 0 };
+  });
+  let batT = 8; // seconds to the next pair
+  function flit(dt) {
+    if (!bats[0].on && !bats[1].on && (batT -= dt) <= 0) {
+      // in from one side, across over the trees and out at the other
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      const y0 = rand(220, 430);
+      bats.forEach((b, i) =>
+        Object.assign(b, { on: true, age: -i * rand(0.3, 0.9), x0: dir > 0 ? -120 : PW + 120, y0: y0 + rand(-70, 70), dir, v: rand(330, 420), ph: rand(0, 6), flap: rand(0, 1), rate: rand(8, 10) }),
+      );
+    }
+    for (const b of bats) {
+      b.m.visible = false;
+      if (!b.on) continue;
+      b.age += dt;
+      if (b.age < 0) continue;
+      const t = b.age;
+      // along, with a flutter, and sudden jinks up and down
+      const x = b.x0 + b.dir * (b.v * t + 40 * Math.sin(t * 2.3 + b.ph));
+      const y = b.y0 + 45 * Math.sin(t * 1.6 + b.ph) + 22 * Math.sin(t * 4.7 + b.ph * 2) + 30 * Math.sin(t * 0.7 + b.ph) ** 3;
+      const vx = dt > 0 ? (x - b.x) / dt : 0;
+      const vy = dt > 0 ? (y - b.y) / dt : 0;
+      b.x = x;
+      b.y = y;
+      if (x < -200 || x > PW + 200) {
+        b.on = false;
+        batT = rand(14, 24);
         continue;
       }
-      e.age += dt;
-      e.y += e.vy * dt;
-      const x = e.x0 + 14 * Math.sin(time * 1.3 + e.phase) + 6 * Math.sin(time * 3.1 + e.phase * 2);
-      // in quickly, out as it nears its height
-      const a = Math.min(1, e.age / 0.5) * smooth(e.y, e.top, e.top + 120);
-      if (e.y <= e.top) {
-        e.wait = rand(0.2, 1.6);
-        continue;
-      }
-      e.m.visible = e.light.visible = true;
-      e.m.position.set(...toArt(x, e.y), 0.008);
-      e.m.rotation.z = 0.15 * Math.sin(time * 2 + e.phase);
-      e.m.material.opacity = a;
-      e.light.position.set(...toArt(x, e.y), 0.007);
-      e.light.material.uniforms.uK.value = 0.35 * a * (0.75 + 0.25 * Math.sin(time * 8 + e.phase));
+      b.flap = (b.flap + dt * b.rate) % 1;
+      b.tex.offset.x = Math.floor(b.flap * FRAMES) / FRAMES;
+      b.m.visible = true;
+      b.m.position.set(...toArt(x, y), 0.003);
+      b.m.scale.x = 1;
+      b.m.rotation.z = THREE.MathUtils.clamp(Math.atan2(-vy, Math.abs(vx) + 1) * 0.5, -0.4, 0.4) * b.dir;
     }
   }
 
@@ -427,9 +591,11 @@ export async function loadScene05() {
     fireU.value = 0.85 + 0.1 * Math.sin(time * 7.3) + 0.06 * Math.sin(time * 13.1 + 1.0);
     cookU.value = smooth(time, 0, COOK); // he browns while you're here, then stays golden
     fireGlow.material.uniforms.uK.value = 0.2 * fireU.value;
+    smokeMat.uniforms.uK.value = 0.55 + 0.45 * cookU.value; // more as he cooks
     poke(dt);
-    rise(dt);
     bubble(dt);
+    shoot(dt);
+    flit(dt);
   }
 
   // view: the view's width and height per unit depth at the camera's rest

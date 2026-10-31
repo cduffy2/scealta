@@ -15,8 +15,8 @@ end so the salmon lies on the right, clear of the text, and Fionn reaches in fro
   assets/cutouts/s05_hand.png     Fionn's hand round his one stick, repainted (below), so it can
                                   prod the salmon (where the painted sticks went into the
                                   flames, more flames)
-  assets/cutouts/s05_mirrored.png the whole painting, mirrored, his stick to the salmon (the
-                                  flat scene)
+  assets/cutouts/s05_mirrored.png the whole painting, mirrored, his stick to the salmon, without
+                                  the embers (the flat scene)
   assets/cutouts/s05_fire.json    their boxes, the water's edge, the fire's box, and his arm:
                                   where it turns (at the edge), the stick's tip, where it
                                   meets the salmon, and how far it turns to get there
@@ -238,6 +238,7 @@ def over(base, im, x, y):
 scene = mir["s05_sky.png"].astype(np.float32)
 over(scene, mir["s05_trees.png"], 0, 0)
 over(scene, mir["s05_near.png"], 0, 0)
+bare = scene.copy()  # without the embers (on the site, smoke rises instead)
 for e in meta["embers"]:
     over(scene, mir[e["name"] + ".png"], e["x"], e["y"])
 before = scene.copy()
@@ -317,7 +318,7 @@ held = np.pad(handRGBA, ((M, M), (0, 0), (0, 0)))
 R = cv2.getRotationMatrix2D((float(pivot[0] - ax0), float(pivot[1] - ay0 + M)), -float(np.degrees(ang)), 1)
 turned = cv2.warpAffine(held, R, (held.shape[1], held.shape[0]), flags=cv2.INTER_CUBIC, borderValue=(0, 0, 0, 0))
 flat = np.zeros((H + 2 * M, W + PAD, 3), np.float32)
-flat[M : M + H, :W] = scene
+flat[M : M + H, :W] = bare
 over(flat, turned, ax0, ay0)
 cv2.imwrite(str(ROOT / "assets/cutouts/s05_mirrored.png"), flat[M : M + H, :W].astype(np.uint8))
 (ROOT / "assets/cutouts/s05_fire.json").write_text(json.dumps(meta, indent=2) + "\n")
