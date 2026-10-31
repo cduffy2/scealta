@@ -29,6 +29,9 @@ export const strings = {
     s05Title: 'The Thumb',
     s05Hook: 'Fionn turned the salmon slowly over the fire, careful as he had been told.',
     s05Body: 'As it cooked, a blister rose on its silver skin. Afraid his master would think it spoiled, Fionn pressed it flat with his thumb, and the hot skin burned him. Without thinking, he put his thumb in his mouth.',
+    s06Title: 'The Teacher',
+    s06Hook: 'It is the fate of all teachers that their students must one day surpass them.',
+    s06Body: 'This is the part the story does not always tell. Finegas did not fight it. He gave the boy the rest of the fish. Fionn grew up to lead the Fianna, the greatest warriors in Ireland. In the end, Finegas understood that passing on what he knew was the same as having it.',
   },
   ga: {
     title: 'Bra[d]án\nan Feasa',
@@ -58,6 +61,9 @@ export const strings = {
     s05Title: 'An Ordóg',
     s05Hook: 'Fionn turned the salmon slowly over the fire, careful as he had been told.',
     s05Body: 'As it cooked, a blister rose on its silver skin. Afraid his master would think it spoiled, Fionn pressed it flat with his thumb, and the hot skin burned him. Without thinking, he put his thumb in his mouth.',
+    s06Title: 'An Múinteoir',
+    s06Hook: 'It is the fate of all teachers that their students must one day surpass them.',
+    s06Body: 'This is the part the story does not always tell. Finegas did not fight it. He gave the boy the rest of the fish. Fionn grew up to lead the Fianna, the greatest warriors in Ireland. In the end, Finegas understood that passing on what he knew was the same as having it.',
   },
 };
 
