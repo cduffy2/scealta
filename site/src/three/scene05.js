@@ -177,10 +177,10 @@ export async function loadScene05() {
     float fish = texture2D(uFish, clamp(wuv, 0.0, 1.0)).r * step(0.0, wuv.x) * step(wuv.x, 1.0);
     float under = 1.0 - smoothstep(${PH - meta.salmon.bottom}.0, ${PH - meta.salmon.top}.0, py); // 0 on his back, 1 on his belly
     float blotch = 0.5 + 0.25 * sin(px.x * 0.021 + sin(px.y * 0.017) * 2.0) + 0.25 * sin(px.y * 0.043 - px.x * 0.009 + 1.3);
-    float k = uCook * fish * (0.45 + 0.55 * under) * (0.75 + 0.5 * blotch);
+    float k = uCook * fish * (0.75 + 0.25 * under) * (0.8 + 0.4 * blotch);
     float lum = dot(diffuseColor.rgb, vec3(0.3, 0.55, 0.15));
-    vec3 brown = lum * vec3(1.9, 0.8, 0.13); // golden brown (in linear light), deeper on his belly
-    diffuseColor.rgb = mix(diffuseColor.rgb, brown, 0.8 * k) * (1.0 - k * (0.2 * under + 0.1 * blotch));
+    vec3 brown = lum * vec3(1.75, 0.62, 0.09); // golden brown (in linear light), deeper on his belly
+    diffuseColor.rgb = mix(diffuseColor.rgb, brown, 0.92 * k) * (1.0 - k * (0.28 * under + 0.12 * blotch));
     // past the painting's sides only the water carries on (no second hand, no second fish)
     diffuseColor.a *= (wuv.x < 0.0 || wuv.x > 1.0) ? wet : 1.0;
     // past its foot it fades to the night (on phones the text sits there)
@@ -243,17 +243,20 @@ export async function loadScene05() {
   const blisterMat = new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
-    uniforms: { uK: { value: 0 } },
+    uniforms: { uK: { value: 0 }, uCook: cookU },
     vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     fragmentShader: `
       varying vec2 vUv;
       uniform float uK;
+      uniform float uCook;
       void main() {
         vec2 p = (vUv - 0.5) * 2.0;
         float r = length(p);
         vec3 n = normalize(vec3(p * 0.9, sqrt(max(0.0, 1.0 - r * r))));
         float lit = max(0.0, dot(n, normalize(vec3(-0.4, 0.6, 0.7))));
         vec3 skin = mix(vec3(0.7, 0.66, 0.2), vec3(1.0, 0.95, 0.6), lit);
+        // on him as he cooks, a pale golden brown
+        skin = mix(skin, mix(vec3(0.62, 0.36, 0.12), vec3(0.98, 0.78, 0.48), lit), 0.8 * uCook);
         skin += pow(max(0.0, dot(reflect(vec3(0.0, 0.0, -1.0), n), normalize(vec3(-0.4, 0.6, 0.7)))), 18.0) * 0.6;
         // a thin warm rim where it rises from the skin
         skin = mix(skin, vec3(0.9, 0.45, 0.12), smoothstep(0.7, 0.95, r) * 0.6);

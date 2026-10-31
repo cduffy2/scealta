@@ -61,6 +61,7 @@ STICK_TIP = (2472, 1279)
 STICK_HALF = (6.0, 18.0)
 STICK_SAMPLE = 2662
 FIST_OVERLAP = 6  # px it runs on in under his fingers
+NOTCH_X, NOTCH_Y = 2713, 1291  # where his thumb's outline reaches the stick's lip
 
 b, g, r = [art[..., i].astype(int) for i in range(3)]
 warm = (r > 60).astype(np.uint8)
@@ -267,14 +268,14 @@ col = handRGBA[:, STICK_SAMPLE - ox]
 rows = np.nonzero(col[:, 3] > 128)[0]
 profile = col[rows.min() : rows.max() + 1, :3].astype(np.float32)  # top to bottom, across it
 (fx, fy), (tx, ty) = STICK_FIST, STICK_TIP
-yy, xx = np.mgrid[0 : handRGBA.shape[0], 0 : fx - ox + FIST_OVERLAP]
+yy, xx = np.mgrid[0 : handRGBA.shape[0], 0 : NOTCH_X - ox]
 sx, sy = xx + ox + 0.5, yy + oy + 0.5
 f = np.clip((sx - tx) / (fx - tx), 0, 1)  # 0 at the tip, 1 at his fist
 centre = ty + (fy - ty) * f
 half = STICK_HALF[0] + (STICK_HALF[1] - STICK_HALF[0]) * f
 # the painted stick goes: everything along its way left of his fist (his knuckles stay)
 way = (np.abs(sy - centre) <= half + 6) & (sx < fx)
-handRGBA[:, : fx - ox + FIST_OVERLAP, 3][way] = 0
+handRGBA[:, : NOTCH_X - ox, 3][way] = 0
 t = (sy - (centre - half)) / (2 * half)  # 0 at its top edge, 1 at its bottom
 inside = np.clip(np.minimum(sy - (centre - half), centre + half - sy) + 0.5, 0, 1)
 inside *= np.clip(sx - tx + 0.5, 0, 1)  # its end, cut square and soft
@@ -284,11 +285,20 @@ hi = np.minimum(lo + 1, len(profile) - 1)
 w = (idx - lo)[..., None]
 shade = profile[lo] * (1 - w) + profile[hi] * w
 shade *= (0.9 + 0.1 * f)[..., None]  # a touch darker towards its tip, out of the firelight
-region = handRGBA[:, : fx - ox + FIST_OVERLAP]
+region = handRGBA[:, : NOTCH_X - ox]
+inside *= sx < fx + FIST_OVERLAP
 cover = inside * (region[..., 3] < 250)  # under his fingers his fist stays on top
 new_a = np.maximum(region[..., 3] / 255, inside)
 region[..., :3] = (region[..., :3] * (1 - cover[..., None]) + shade * cover[..., None]).astype(np.uint8)
 region[..., 3] = (new_a * 255).astype(np.uint8)
+# and above it, left of his thumb's outline, the painted stick's lip goes too (the trees show)
+# his thumb's outline carried on down to the stick's top edge, on a slant
+edge = NOTCH_Y + (NOTCH_X - sx) * (fy - STICK_HALF[1] - NOTCH_Y) / (NOTCH_X - fx)
+above = np.clip(edge - sy + 0.5, 0, 1) * (sx < NOTCH_X) * (sx >= fx)
+above = np.maximum(above, (sx < fx) & (sy < centre - half))
+region[..., 3] = (region[..., 3] * (1 - above)).astype(np.uint8)
+rim = np.clip(1 - np.abs(sy - edge - 1.2) / 1.5, 0, 1) * (sx < NOTCH_X) * (sx >= fx) * (region[..., 3] > 0)
+region[..., :3] = (region[..., :3] * (1 - 0.6 * rim[..., None])).astype(np.uint8)
 # and no crumbs of the old stick's tip left about it
 n, lab, stats, _ = cv2.connectedComponentsWithStats((handRGBA[..., 3] > 0).astype(np.uint8), 8)
 handRGBA[..., 3][lab != 1 + np.argmax(stats[1:, 4])] = 0
