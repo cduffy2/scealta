@@ -128,7 +128,7 @@ export async function loadScene05() {
 
   // The trees: they stir in slow, broad waves, as if in a light breeze (their tops too),
   // and now and then a few of their dashes catch the firelight. Over the salmon the heat
-  // off the fire makes them shimmer, in ripples rising, strongest just above him.
+  // off the fire makes them shimmer faintly, in ripples rising, strongest just above him.
   layers.trees.add(
     plate(
       treesTex,
@@ -142,8 +142,8 @@ export async function loadScene05() {
       float heat = smoothstep(${HAZE[0] - 120}.0, ${HAZE[0] + 80}.0, wuv.x * ${PW}.0) * (1.0 - smoothstep(${HAZE[1] - 80}.0, ${HAZE[1] + 120}.0, wuv.x * ${PW}.0))
         * smoothstep(${HAZE[2]}.0, ${HAZE[3]}.0, yd);
       off += vec2(
-        sin(yd * 0.045 + uTime * 5.0 + wuv.x * 37.0) * 0.0011 + sin(yd * 0.11 + uTime * 8.3 - wuv.x * 61.0) * 0.0005,
-        sin(wuv.x * 90.0 + yd * 0.03 + uTime * 4.1) * 0.0007
+        sin(yd * 0.045 + uTime * 3.5 + wuv.x * 37.0) * 0.00045 + sin(yd * 0.11 + uTime * 6.0 - wuv.x * 61.0) * 0.0002,
+        sin(wuv.x * 90.0 + yd * 0.03 + uTime * 3.0) * 0.00025
       ) * heat;
       vec4 texel = texture2D(map, wuv + off);
       diffuseColor *= texel;
