@@ -7,9 +7,9 @@ import meta from './s05-fire.json';
 // water, the grill, the fire and the salmon. The camera pans along to it from scene 04 (a
 // new place, a new time), so the trees and the night lag behind the fire; at rest they line
 // up as painted. Here Fionn's hand reaches in from the right and now and then prods the
-// salmon with his stick, the flames flicker, embers drift up from the fire and fade,
-// now and then a blister swells on the salmon's skin, the stars twinkle, the trees stir and
-// the water sways.
+// salmon with his stick, the salmon cooks slowly to a golden brown, the flames flicker,
+// embers drift up from the fire and fade, now and then a blister swells on his skin and
+// bursts, the stars twinkle, the trees stir and the water sways.
 //
 // Work is done in the painting's pixels (2912 x 1632, y down), mapped onto a plate D units
 // wide at depth D in front of the camera's rest (cover framing, like scene 04); the far
@@ -31,6 +31,7 @@ const UNDER = 2;
 const DEPTH = { sky: 1.5, trees: 1.18, near: 1 };
 const GRILL = [1122, 1370, 2762]; // x0, top, x1 of the grill (it stands still in the water)
 const NIGHT = 'vec3(0.012, 0.035, 0.012)';
+const COOK = 30; // seconds for him to cook through
 
 // a soft round light, uK its strength
 const glow = (color, falloff = 2.0) =>
@@ -58,11 +59,12 @@ export async function loadScene05() {
     return t;
   };
   const size = window.innerWidth < 1000 ? 1600 : 2912;
-  const [skyTex, treesTex, nearTex, flamesTex, handTex, ...emberTex] = await Promise.all([
+  const [skyTex, treesTex, nearTex, flamesTex, fishTex, handTex, ...emberTex] = await Promise.all([
     load(`/images/s05/sky-${size}.webp`),
     load(`/images/s05/trees-${size}.webp`),
     load(`/images/s05/near-${size}.webp`),
     load('/images/s05/flames.webp', false),
+    load('/images/s05/fish.webp', false),
     load('/images/s05/hand.webp'),
     ...meta.embers.map((e) => load(`/images/s05/${e.name.slice(4)}.webp`)),
   ]);
@@ -100,6 +102,7 @@ export async function loadScene05() {
   }
 
   const fireU = { value: 1 }; // the fire's brightness, flickering
+  const cookU = { value: 0 }; // how far he has cooked, 0 -> 1
 
   // The night: its stars twinkle, each in its own time.
   layers.sky.add(
@@ -169,6 +172,15 @@ export async function loadScene05() {
       0.07 * pow(0.5 + 0.5 * sin(wuv.x * 90.0 - uTime * 0.6 + sin(py * 0.2 + uTime * 0.3) * 2.0), 6.0));
     // the flames brighten and dim, in patches
     diffuseColor.rgb *= 1.0 + flame * (0.12 * sin(wuv.x * 40.0 - uTime * 5.0) + 0.08 * sin(uTime * 11.0 + wuv.x * 13.0));
+    // He cooks: over half a minute his skin browns, to a golden brown and no further, most
+    // on his belly over the flames and unevenly, in patches; his spots stay dark.
+    float fish = texture2D(uFish, clamp(wuv, 0.0, 1.0)).r * step(0.0, wuv.x) * step(wuv.x, 1.0);
+    float under = 1.0 - smoothstep(${PH - meta.salmon.bottom}.0, ${PH - meta.salmon.top}.0, py); // 0 on his back, 1 on his belly
+    float blotch = 0.5 + 0.25 * sin(px.x * 0.021 + sin(px.y * 0.017) * 2.0) + 0.25 * sin(px.y * 0.043 - px.x * 0.009 + 1.3);
+    float k = uCook * fish * (0.45 + 0.55 * under) * (0.75 + 0.5 * blotch);
+    float lum = dot(diffuseColor.rgb, vec3(0.3, 0.55, 0.15));
+    vec3 brown = lum * vec3(1.9, 0.8, 0.13); // golden brown (in linear light), deeper on his belly
+    diffuseColor.rgb = mix(diffuseColor.rgb, brown, 0.8 * k) * (1.0 - k * (0.2 * under + 0.1 * blotch));
     // past the painting's sides only the water carries on (no second hand, no second fish)
     diffuseColor.a *= (wuv.x < 0.0 || wuv.x > 1.0) ? wet : 1.0;
     // past its foot it fades to the night (on phones the text sits there)
@@ -177,9 +189,9 @@ export async function loadScene05() {
     diffuseColor.rgb = mix(diffuseColor.rgb, ${NIGHT}, foot);
     diffuseColor.a = max(diffuseColor.a, foot);
     `,
-    { foot: FOOT, uniforms: { uFlames: { value: flamesTex } }, order: UNDER + 2 },
+    { foot: FOOT, uniforms: { uFlames: { value: flamesTex }, uFish: { value: fishTex }, uCook: cookU }, order: UNDER + 2 },
   );
-  flamesTex.wrapS = flamesTex.wrapT = THREE.ClampToEdgeWrapping;
+  flamesTex.wrapS = flamesTex.wrapT = fishTex.wrapS = fishTex.wrapT = THREE.ClampToEdgeWrapping;
   near.add(nearPlate);
 
   // the fire's warm light, over the flames and on his belly
@@ -410,6 +422,7 @@ export async function loadScene05() {
     time += dt;
     timeU.value = time;
     fireU.value = 0.85 + 0.1 * Math.sin(time * 7.3) + 0.06 * Math.sin(time * 13.1 + 1.0);
+    cookU.value = smooth(time, 0, COOK); // he browns while you're here, then stays golden
     fireGlow.material.uniforms.uK.value = 0.2 * fireU.value;
     poke(dt);
     rise(dt);

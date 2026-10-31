@@ -52,6 +52,15 @@ SWAP = (340, 1278, 532, 1396)  # x0, y0, x1, y1: the first flames, swapped for t
 # salmon: the underside of his tail, just in from the fin
 REPAINTED = [(2912, 1165), (2640, 1165), (2605, 1292), (2400, 1246), (2392, 1268), (2585, 1300), (2590, 1362), (2912, 1362)]
 POKE = (2478, 1234)
+# his stick as drawn again (mirrored, as the scene is seen): where it leaves his fist and its
+# tip, its half-width at each, and where its painted cross-section is taken
+FISH_X = (290, 1640)  # the salmon, tail to snout
+FISH_BELOW = 1318
+STICK_FIST = (2700, 1320)
+STICK_TIP = (2472, 1279)
+STICK_HALF = (6.0, 18.0)
+STICK_SAMPLE = 2662
+FIST_OVERLAP = 6  # px it runs on in under his fingers
 
 b, g, r = [art[..., i].astype(int) for i in range(3)]
 warm = (r > 60).astype(np.uint8)
@@ -191,6 +200,20 @@ flames = cv2.dilate(flames, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (17, 17
 fl = cv2.resize(feather(flames, 6), (W // 4, H // 4), interpolation=cv2.INTER_AREA)
 outputs["s05_flames.png"] = (np.clip(fl, 0, 1) * 255).astype(np.uint8)
 
+# Where the salmon is (not the flames licking up round him, nor the grill), a quarter size,
+# softened a little: he cooks, slowly.
+body = near.copy()
+body[FISH_BELOW:] = 0  # below his lowest fins it is all flames
+body[:, :FISH_X[0]] = 0
+body[:, FISH_X[1]:] = 0
+body &= 1 - cv2.dilate(orange, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)))  # the flames' bodies
+n, lab, stats, _ = cv2.connectedComponentsWithStats(body, 8)
+body = fill_holes((lab == 1 + np.argmax(stats[1:, 4])).astype(np.uint8))
+fy, _ = np.nonzero(body)
+meta["salmon"] = {"top": int(fy.min()), "bottom": int(fy.max())}
+fm = cv2.resize(feather(body, 2), (W // 4, H // 4), interpolation=cv2.INTER_AREA)
+outputs["s05_fish.png"] = (np.clip(fm, 0, 1) * 255).astype(np.uint8)
+
 # Everything mirrored: the images flipped, every x in the meta measured from the other side.
 for name, im in outputs.items():
     cv2.imwrite(str(ROOT / "assets/cutouts" / name), np.ascontiguousarray(im[:, ::-1]))
@@ -235,12 +258,45 @@ rgb = np.concatenate([edit[ay0:ay1, ax0:ax1], np.repeat(edit[ay0:ay1, W - 1 : W]
 a = feather(arm, 0.8)[ay0:ay1, ax0:ax1]
 a = np.concatenate([a, np.repeat(a[:, -1:], PAD, 1)], 1)
 handRGBA = np.dstack([rgb, (a * 255).astype(np.uint8)])
+
+# His stick, past his fist, drawn again: as painted it thins in a step partway along. It
+# tapers evenly from his fist to its tip instead, shaded across with the painted stick's own
+# cross-section by his fist (its light top, its darker underside).
+ox, oy = ax0, ay0  # the cut-out's origin in the scene
+col = handRGBA[:, STICK_SAMPLE - ox]
+rows = np.nonzero(col[:, 3] > 128)[0]
+profile = col[rows.min() : rows.max() + 1, :3].astype(np.float32)  # top to bottom, across it
+(fx, fy), (tx, ty) = STICK_FIST, STICK_TIP
+yy, xx = np.mgrid[0 : handRGBA.shape[0], 0 : fx - ox + FIST_OVERLAP]
+sx, sy = xx + ox + 0.5, yy + oy + 0.5
+f = np.clip((sx - tx) / (fx - tx), 0, 1)  # 0 at the tip, 1 at his fist
+centre = ty + (fy - ty) * f
+half = STICK_HALF[0] + (STICK_HALF[1] - STICK_HALF[0]) * f
+# the painted stick goes: everything along its way left of his fist (his knuckles stay)
+way = (np.abs(sy - centre) <= half + 6) & (sx < fx)
+handRGBA[:, : fx - ox + FIST_OVERLAP, 3][way] = 0
+t = (sy - (centre - half)) / (2 * half)  # 0 at its top edge, 1 at its bottom
+inside = np.clip(np.minimum(sy - (centre - half), centre + half - sy) + 0.5, 0, 1)
+inside *= np.clip(sx - tx + 0.5, 0, 1)  # its end, cut square and soft
+idx = np.clip(t * (len(profile) - 1), 0, len(profile) - 1)
+lo = np.floor(idx).astype(int)
+hi = np.minimum(lo + 1, len(profile) - 1)
+w = (idx - lo)[..., None]
+shade = profile[lo] * (1 - w) + profile[hi] * w
+shade *= (0.9 + 0.1 * f)[..., None]  # a touch darker towards its tip, out of the firelight
+region = handRGBA[:, : fx - ox + FIST_OVERLAP]
+cover = inside * (region[..., 3] < 250)  # under his fingers his fist stays on top
+new_a = np.maximum(region[..., 3] / 255, inside)
+region[..., :3] = (region[..., :3] * (1 - cover[..., None]) + shade * cover[..., None]).astype(np.uint8)
+region[..., 3] = (new_a * 255).astype(np.uint8)
+# and no crumbs of the old stick's tip left about it
+n, lab, stats, _ = cv2.connectedComponentsWithStats((handRGBA[..., 3] > 0).astype(np.uint8), 8)
+handRGBA[..., 3][lab != 1 + np.argmax(stats[1:, 4])] = 0
 cv2.imwrite(str(ROOT / "assets/cutouts/s05_hand.png"), handRGBA)
 meta["hand"] = {"x": int(ax0), "y": int(ay0), "w": int(ax1 + PAD - ax0), "h": int(ay1 - ay0)}
 edgeYs = np.nonzero(arm[:, W - 1])[0]
 pivot = (float(W), float(edgeYs.mean()))  # his arm turns about where it comes in
-tipX = int(xs.min())
-tip = (float(tipX), float(ys[xs == tipX].mean()))
+tip = (float(STICK_TIP[0]), float(STICK_TIP[1]))
 ang = np.arctan2(POKE[1] - pivot[1], POKE[0] - pivot[0]) - np.arctan2(tip[1] - pivot[1], tip[0] - pivot[0])
 ang = (ang + np.pi) % (2 * np.pi) - np.pi  # clockwise on screen, as the turn up to him
 meta["arm"] = {"pivot": [pivot[0], round(pivot[1], 1)], "tip": [tip[0], round(tip[1], 1)], "poke": list(POKE), "turn": round(float(np.degrees(ang)), 2)}
