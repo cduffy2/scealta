@@ -20,6 +20,8 @@ const jobs = [
   ['s04', 'source/s04_catch_up.png', [960, 1600, 2400, 2912]], // flat scene 04 (2D fallback)
   ['s04-plate', 'cutouts/s04_plate.png', [1600, 2912]], // scene 04 for 3D: the salmon, line and drops live
   ['s05', 'cutouts/s05_mirrored.png', [960, 1600, 2400, 2912]], // flat scene 05 (2D fallback), mirrored like the 3D one
+  ['s06', 'source/s06_teacher_up.png', [960, 1600, 2400, 2912]], // flat scene 06 (2D fallback)
+  ['s06-plate', 'cutouts/s06_plate.png', [1600, 2912]], // scene 06 for 3D: their heads turn live
 ];
 
 await mkdir(out, { recursive: true });
@@ -110,3 +112,15 @@ await sharp(path.join(assets, 'cutouts/s05_fish.png')).webp({ lossless: true }).
 const fireMeta = JSON.parse(await readFile(path.join(assets, 'cutouts/s05_fire.json'), 'utf8'));
 await sharp(path.join(assets, 'cutouts/s05_hand.png')).webp({ quality: 90, alphaQuality: 95 }).toFile(path.join(s05Out, 'hand.webp'));
 await writeFile(path.resolve(here, '../src/three/s05-fire.json'), JSON.stringify(fireMeta, null, 2) + '\n');
+
+// Scene 06's masks (scripts/s06_layers.py): Finegas's hair, what stands still, the salmon;
+// and their heads, Fionn's turning to look up at him and his bowing to look at the boy,
+// frame by frame.
+const s06Out = path.join(out, 's06');
+await mkdir(s06Out, { recursive: true });
+await sharp(path.join(assets, 'cutouts/s06_mask.png')).webp({ lossless: true }).toFile(path.join(s06Out, 'mask.webp'));
+await sharp(path.join(assets, 'cutouts/s06_fionn.png')).webp({ lossless: true }).toFile(path.join(s06Out, 'fionn.webp'));
+await sharp(path.join(assets, 'cutouts/s06_finegas.png')).webp({ lossless: true, exact: true }).toFile(path.join(s06Out, 'finegas.webp'));
+await sharp(path.join(assets, 'cutouts/s06_sheep.png')).webp({ lossless: true, exact: true }).toFile(path.join(s06Out, 'sheep.webp')); // scripts/s06_sheep.py
+const teacherMeta = JSON.parse(await readFile(path.join(assets, 'cutouts/s06_teacher.json'), 'utf8'));
+await writeFile(path.resolve(here, '../src/three/s06-teacher.json'), JSON.stringify(teacherMeta, null, 2) + '\n');

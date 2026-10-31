@@ -10,7 +10,8 @@ import meta from './s05-fire.json';
 // salmon with his stick, the salmon cooks slowly to a golden brown, the flames flicker,
 // smoke rises off him and the heat shimmers over the trees, now and then a blister swells
 // on his skin and bursts, the stars twinkle, a star shoots now and then, bats flit over the
-// trees, the trees stir and the water sways.
+// trees, the trees stir and the water sways. On the way back to scene 06 it's shrunk to sit
+// on that one, and everything but the salmon fades from around him (setLeave).
 //
 // Work is done in the painting's pixels (2912 x 1632, y down), mapped onto a plate D units
 // wide at depth D in front of the camera's rest (cover framing, like scene 04); the far
@@ -33,6 +34,7 @@ const DEPTH = { sky: 1.5, trees: 1.18, near: 1 };
 const GRILL = [1122, 1370, 2762]; // x0, top, x1 of the grill (it stands still in the water)
 const NIGHT = 'vec3(0.012, 0.035, 0.012)';
 const COOK = 30; // seconds for him to cook through
+const FISH = [1272, 2622]; // the salmon, snout to tail (x, painting px)
 // where the heat shimmers over the trees: x0, x1 (over him), and y where it starts and is
 // at its strongest (his back)
 const HAZE = [1330, 2560, 430, 960];
@@ -108,6 +110,8 @@ export async function loadScene05() {
 
   const fireU = { value: 1 }; // the fire's brightness, flickering
   const cookU = { value: 0 }; // how far he has cooked, 0 -> 1
+  const leaveU = { value: 0 }; // on the way to scene 06: 1 when only the salmon is left
+  let leave = 0;
 
   // The night: its stars twinkle, each in its own time.
   layers.sky.add(
@@ -201,8 +205,10 @@ export async function loadScene05() {
     float foot = smoothstep(0.0, 0.025, -wuv.y);
     diffuseColor.rgb = mix(diffuseColor.rgb, ${NIGHT}, foot);
     diffuseColor.a = max(diffuseColor.a, foot);
+    // on the way to scene 06 all but the salmon fades
+    diffuseColor.a *= mix(1.0, fish, uLeave);
     `,
-    { foot: FOOT, uniforms: { uFlames: { value: flamesTex }, uFish: { value: fishTex }, uCook: cookU }, order: UNDER + 2 },
+    { foot: FOOT, uniforms: { uFlames: { value: flamesTex }, uFish: { value: fishTex }, uCook: cookU, uLeave: leaveU }, order: UNDER + 2 },
   );
   flamesTex.wrapS = flamesTex.wrapT = fishTex.wrapS = fishTex.wrapT = THREE.ClampToEdgeWrapping;
   near.add(nearPlate);
@@ -590,12 +596,24 @@ export async function loadScene05() {
     timeU.value = time;
     fireU.value = 0.85 + 0.1 * Math.sin(time * 7.3) + 0.06 * Math.sin(time * 13.1 + 1.0);
     cookU.value = smooth(time, 0, COOK); // he browns while you're here, then stays golden
-    fireGlow.material.uniforms.uK.value = 0.2 * fireU.value;
-    smokeMat.uniforms.uK.value = 0.55 + 0.45 * cookU.value; // more as he cooks
+    fireGlow.material.uniforms.uK.value = 0.2 * fireU.value * (1 - leave);
+    smokeMat.uniforms.uK.value = (0.55 + 0.45 * cookU.value) * (1 - leave); // more as he cooks
     poke(dt);
     bubble(dt);
     shoot(dt);
     flit(dt);
+    // leaving, the blister, the shooting star and the bats are gone at once
+    if (leave > 0) for (const m of [blister, smear, star, ...spatter.map((d) => d.m), ...bats.map((b) => b.m)]) m.visible = false;
+  }
+
+  // On the way to scene 06: k 0 -> 1, the night, the trees, the fire and his hand fade
+  // from around the salmon; fish 1 -> 0, then he fades too.
+  const [skyPlate] = layers.sky.children;
+  const [treesPlate] = layers.trees.children;
+  function setLeave(k, fish = 1) {
+    leave = leaveU.value = k;
+    skyPlate.material.opacity = treesPlate.material.opacity = hand.material.opacity = 1 - k;
+    nearPlate.material.opacity = fish;
   }
 
   // view: the view's width and height per unit depth at the camera's rest
@@ -622,5 +640,17 @@ export async function loadScene05() {
     tick,
     // the near painting's left (-1) or right (+1) edge, in the group's space
     edge: (side) => frame.x + (side * frame.s * D) / 2,
+    setLeave,
+    // the salmon on the grill, in the group's space: his middle along his belly, and his
+    // length, snout to tail
+    fish() {
+      const [x, y] = [(FISH[0] + FISH[1]) / 2, meta.salmon.bottom];
+      return {
+        x: frame.x + (frame.s * (x - PW / 2) * D) / PW,
+        y: frame.y + (frame.s * (PH / 2 - y) * D) / PW,
+        z: -D,
+        len: (frame.s * (FISH[1] - FISH[0]) * D) / PW,
+      };
+    },
   };
 }

@@ -241,6 +241,10 @@
   .scene__copy[data-scene-copy='5'] {
     top: 43svh;
   }
+  /* scene 06's painting a little shorter, 40%, for its longer text (Figma: Mobile 06) */
+  .scene__copy[data-scene-copy='6'] {
+    top: 38svh;
+  }
   .scene__title {
     font-size: 48px;
   }
