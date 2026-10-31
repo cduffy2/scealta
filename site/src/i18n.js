@@ -26,6 +26,9 @@ export const strings = {
     s04Title: 'The Catch',
     s04Hook: 'Then one morning, the water moved differently.',
     s04Body: 'Finegas felt it before he saw it, a weight on the line unlike any other. Silver, vast, ancient. He told Fionn to cook it carefully, and to eat none of it. Then he went to rest, certain his long wait was finally over.',
+    s05Title: 'The Thumb',
+    s05Hook: 'Fionn turned the salmon slowly over the fire, careful as he had been told.',
+    s05Body: 'As it cooked, a blister rose on its silver skin. Afraid his master would think it spoiled, Fionn pressed it flat with his thumb, and the hot skin burned him. Without thinking, he put his thumb in his mouth.',
   },
   ga: {
     title: 'Bra[d]án\nan Feasa',
@@ -52,6 +55,9 @@ export const strings = {
     s04Title: 'An Ghabháil',
     s04Hook: 'Then one morning, the water moved differently.',
     s04Body: 'Finegas felt it before he saw it, a weight on the line unlike any other. Silver, vast, ancient. He told Fionn to cook it carefully, and to eat none of it. Then he went to rest, certain his long wait was finally over.',
+    s05Title: 'An Ordóg',
+    s05Hook: 'Fionn turned the salmon slowly over the fire, careful as he had been told.',
+    s05Body: 'As it cooked, a blister rose on its silver skin. Afraid his master would think it spoiled, Fionn pressed it flat with his thumb, and the hot skin burned him. Without thinking, he put his thumb in his mouth.',
   },
 };
 
