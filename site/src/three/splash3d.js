@@ -410,7 +410,12 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     well.intensity = peak * (through ? 1 - smoothstep(SPLIT, SPLIT + 0.12, p) : 0.92 * near ** 3); // dark at rest, like the scene
     // ScrollTrigger reports tiny progress values while it measures; ignore those
     const a = p < 0.002 ? 1 : 1 - THREE.MathUtils.clamp(p / 0.18, 0, 1);
-    if (a !== lastFade) gsap.set(fade, { autoAlpha: a }); // leaves the intro alone until scrolling starts
+    // leaves the intro alone until scrolling starts; once it has, the intro's fade in (if it
+    // hasn't run yet, as when the page opens part way down) mustn't bring them back
+    if (a !== lastFade) {
+      if (a < 1) gsap.killTweensOf(fade);
+      gsap.set(fade, { autoAlpha: a, y: 0 });
+    }
     lastFade = a;
   }
   let lastFade = 1;

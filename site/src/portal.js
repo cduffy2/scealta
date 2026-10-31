@@ -60,7 +60,12 @@ export function createPortal({ splash, title, letter, portal, image, fade, onCha
     // black at rest, fading up from black as you scroll in
     image.style.filter = `brightness(${gsap.utils.clamp(0, 1, (p - 0.04) / 0.4)})`;
     const a = 1 - gsap.utils.clamp(0, 1, p / 0.18);
-    if (a !== lastFade) gsap.set(fade, { autoAlpha: a }); // only once scrolling has begun, so the intro owns the start
+    // leaves the intro alone until scrolling starts; once it has, the intro's fade in (if it
+    // hasn't run yet, as when the page opens part way down) mustn't bring them back
+    if (a !== lastFade) {
+      if (a < 1) gsap.killTweensOf(fade);
+      gsap.set(fade, { autoAlpha: a });
+    }
     lastFade = a;
   }
   let lastFade = 1;
