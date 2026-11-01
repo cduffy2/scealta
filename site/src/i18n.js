@@ -14,6 +14,7 @@ export const strings = {
     playMotion: 'Play motion',
     salmonAlt: 'An ancient salmon drawn in fine glowing green lines, its eye a single point of vermilion.',
     scroll: 'Scroll',
+    keepScrolling: 'Keep scrolling',
     s01Title: 'The Well',
     s01Hook: 'Before the world was as it is, there was a deep well of water.',
     s01Body: 'The Well of Segais was hidden away near Carbury in County Kildare, where the rivers of Ireland were said to rise. The river Boyne came out of it first. Around the well grew nine hazel trees, and every autumn their nuts dropped into the water. Inside every nut was a share of all that was ever known.',
@@ -54,6 +55,7 @@ export const strings = {
     playMotion: 'Seinn an ghluaiseacht',
     salmonAlt: 'Bradán ársa i línte míne glasa lonracha, a shúil ina pointe amháin dearg.',
     scroll: 'Scrollaigh',
+    keepScrolling: 'Lean ort ag scrollú',
     // scene text in Irish still to be translated; the Irish title stands in for now
     s01Title: 'An Tobar',
     s01Hook: 'Before the world was as it is, there was a deep well of water.',

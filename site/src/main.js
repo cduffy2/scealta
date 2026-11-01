@@ -27,7 +27,7 @@ let title = null; // { chars, portal } for the current language
 let portal = null; // 2D zoom (fallback)
 let splash3d = null; // 3D title, salmon and fly-through
 let introTl = null;
-const progress = createProgress(document.querySelector('.progress'));
+const progress = createProgress(document.querySelector('.progress'), document.querySelector('.rail'));
 
 // With motion off there is no zoom to report progress, so the plain scroll does.
 let plainProgress = null;
@@ -44,7 +44,7 @@ function trackPlainScroll(on) {
     : null;
 }
 
-// In the flat version each later scene is its own section: the next dot fills as it
+// In the flat version each later scene is its own section: the rail fills as it
 // scrolls up into view. (In 3D the pinned splash reports the whole journey itself.)
 let sceneProgress = [];
 function trackScenes(on) {
@@ -110,6 +110,7 @@ function setIcon(button, name) {
 // ---- Language --------------------------------------------------------------
 function renderLang() {
   applyStrings(state.lang);
+  progress.refresh(); // the rail names the next scene
   for (const b of document.querySelectorAll('[data-lang]')) b.setAttribute('aria-pressed', String(b.dataset.lang === state.lang));
   renderMotion(); // its label is language-dependent
 }
@@ -183,7 +184,7 @@ for (const b of document.querySelectorAll('[data-choose]')) {
 }
 
 // ---- Credits ---------------------------------------------------------------
-// The chapter dots and pause button make way once the credits are in view, and the link
+// The chapter progress and pause button make way once the credits are in view, and the link
 // at the bottom goes back to the title (the pinned 3D journey included).
 new IntersectionObserver(([e]) => root.classList.toggle('at-end', e.isIntersecting)).observe(document.getElementById('credits'));
 document.querySelector('[data-back-to-top]').addEventListener('click', (e) => {

@@ -183,7 +183,7 @@
   line-height: 1.65;
   color: var(--body);
 }
-/* Chapter progress: widths and fills are set from the scroll (src/progress.js) */
+/* Chapter counter: its fade is set from the scroll (src/progress.js) */
 .progress {
   position: fixed;
   left: var(--gutter);
@@ -192,28 +192,187 @@
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 16px;
   color: var(--parchment);
 }
-.dots {
+/* The rail to the next scene: fill and states are set from the scroll (src/progress.js).
+   Small at rest; both sizes share a centre line, so it doesn't shift sideways. */
+.rail {
+  --dot: 4px;
+  --gap: 6px;
+  --pill: 24px;
+  --bar: 4px;
+  --capsule: 12px;
+  --pad: 8px;
+  --leg: 0;
+  --change: 0.32s var(--ease-out);
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 24px;
+  width: 24px;
+  z-index: 10;
   display: flex;
-  gap: 8px;
   align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transition: opacity 0.24s, visibility 0.24s;
 }
-.dots i {
+.rail.is-awake {
+  --dot: 8px;
+  --gap: 8px;
+  --pill: 112px;
+  --bar: 8px;
+  --capsule: 24px;
+  --pad: 12px;
+  --change: 0.24s var(--ease-out);
+}
+.rail__body {
   position: relative;
-  width: 8px;
-  height: 8px;
-  border-radius: 4px;
-  overflow: hidden;
-  background: rgb(241 233 210 / 0.35); /* parchment, faint: still to come */
 }
-.dots i::after {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: calc(var(--fill, 0) * 100%);
+.rail__capsule {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: var(--capsule);
+  padding-block: var(--pad);
+  border-radius: calc(var(--capsule) / 2);
+  background: rgb(12 18 11 / 0.62);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition: width var(--change), padding var(--change), border-radius var(--change);
+}
+.rail__dot {
+  flex: none;
+  width: var(--dot);
+  height: var(--dot);
+  margin-top: var(--gap);
+  border-radius: 50%;
+  background: rgb(241 233 210 / 0.35); /* parchment, faint: still to come */
+  transition: width var(--change), height var(--change), margin var(--change), background-color 0.2s, box-shadow 0.2s;
+}
+.rail__slot:first-child + .rail__dot {
+  margin-top: 0;
+}
+.rail__dot.is-read {
   background: var(--glow);
+}
+.rail__slot {
+  flex: none;
+  width: var(--bar);
+  height: 0;
+  border-radius: calc(var(--bar) / 2);
+  overflow: hidden;
+  background: rgb(241 233 210 / 0.35);
+  transition: width var(--change), height var(--change), margin var(--change);
+}
+.rail__slot.is-open {
+  height: var(--pill);
+  margin-top: var(--gap);
+}
+.rail__slot.is-open:first-child {
+  margin-top: 0;
+  margin-bottom: var(--gap);
+}
+.rail__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--glow);
+}
+/* the next scene's name, level with its dot */
+.rail__label,
+.rail__hint {
+  position: absolute;
+  top: calc(var(--pad) + var(--leg) * (var(--dot) + var(--gap)) + var(--pill) + var(--gap) + var(--dot) / 2);
+  right: calc(100% + 6px);
+  height: 28px;
+  padding-inline: 12px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  border-radius: 14px;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: top var(--change), opacity 0.2s, color 0.2s;
+}
+/* Gaillimh's capitals sit high in the line: this centres them in the pill */
+.rail__label > span,
+.rail__hint > span {
+  position: relative;
+  top: 0.125em;
+}
+.rail__label {
+  gap: 8px;
+  color: var(--parchment);
+  background: rgb(12 18 11 / 0.62);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.rail__number {
+  color: var(--muted);
+  transition: color 0.2s;
+}
+.rail.is-awake:not(.is-nudge, .is-last) .rail__label {
+  opacity: 1;
+}
+.rail.is-arrived .rail__label,
+.rail.is-arrived .rail__number {
+  color: var(--glow);
+}
+/* stopped part way between scenes */
+.rail__hint {
+  gap: 6px;
+  color: var(--peat-black);
+  background: var(--parchment);
+}
+.rail__hint svg {
+  width: 14px;
+  height: 14px;
+}
+.rail.is-nudge .rail__hint {
+  opacity: 1;
+}
+.rail.is-nudge .rail__hint svg {
+  animation: rail-bob 1.2s ease-in-out 3;
+}
+.rail.is-nudge .rail__dot.is-next {
+  background: var(--parchment);
+  box-shadow: 0 0 0 2px var(--glow);
+}
+@keyframes rail-bob {
+  50% {
+    transform: translateY(3px);
+  }
+}
+html[data-motion='off'] .rail * {
+  transition-duration: 0s;
+}
+/* a phone's margin only fits the bare rail, and it goes when the finger lifts */
+@media (max-width: 600px) {
+  .rail,
+  .rail.is-awake {
+    --dot: 6px;
+    --gap: 6px;
+    --pill: 88px;
+    --bar: 6px;
+    --capsule: 14px;
+    --pad: 8px;
+    right: 4px;
+    width: 14px;
+  }
+  .rail.is-awake {
+    transition-duration: 0.12s;
+  }
+  .rail:not(.is-awake) {
+    opacity: 0;
+    visibility: hidden;
+  }
+  .rail__label {
+    display: none;
+  }
+  .rail__hint {
+    right: calc(100% + 4px);
+  }
 }
 /* in 3D mode the scene text lives on the splash and the flat scenes are not needed.
    flat-off is set in index.html, before the images are parsed, so theirs never download */
