@@ -46,26 +46,44 @@ const TITLE_DIST = 8;
 const NEAR_FACE = 0.03; // how close to the front face the first phase gets
 const SPLIT = 0.55; // share of the flight spent approaching the title
 // The pinned scroll: the flight takes the first FLIGHT of it (the salmon swims off left at
-// the start), then scene 01's text comes in and holds before the page moves on.
-const FLIGHT = 0.68;
-const TEXT_IN = [0.72, 0.84];
-const LANDED = TEXT_IN[1] + 0.02; // scene 01 fully in: where the Listen / Read buttons land
-const SWIM_OFF = [0.005, 0.22];
+// the start), then scene 01's text comes in and the dive starts straight after.
+const FLIGHT = 0.907;
+const TEXT_IN = [0.945, 0.985];
+const LANDED = 0.99; // scene 01 fully in: where the Listen / Read buttons land
+const SWIM_OFF = [0.007, 0.293];
 // The whole pin, in screen heights of scroll. Scene 01 keeps its first S1 (all the
-// fractions above are of that), then the dive and scene 02 follow.
-const S1 = 3.2;
-const TOTAL = 19.4;
-const DIVE = [S1, 4.7];
-const FISH_IN = [4.35, 5.3];
-const TEXT2_IN = [5.0, 5.4];
-const RISE = [6.4, 8.0];
-const TEXT3_IN = [8.2, 8.6];
-const DIVE4 = [9.2, 10.8];
-const TEXT4_IN = [11.0, 11.4];
-const PAN5 = [12.4, 14.2];
-const TEXT5_IN = [14.4, 14.8];
-const PULL6 = [15.8, 17.8];
-const TEXT6_IN = [18.0, 18.4];
+// fractions above are of that), then the dive and scene 02 follow. Each scene's way out starts
+// where its text is fully in, so the next scroll after an arrival moves something.
+const S1 = 2.4;
+const TOTAL = 12.3;
+const DIVE = [S1, 3.9];
+const FISH_IN = [3.55, 4.25];
+const FISH_GLIDE = 3; // how quickly he closes on his place in scene 02 (per second)
+const TEXT2_IN = [4.2, 4.25];
+const RISE = [4.25, 5.85];
+const TEXT3_IN = [6.05, 6.1];
+const DIVE4 = [6.1, 7.7];
+const TEXT4_IN = [7.9, 7.95];
+const PAN5 = [7.95, 9.75];
+const TEXT5_IN = [9.95, 10.0];
+const PULL6 = [10.0, 12.0];
+const TEXT6_IN = [12.2, 12.25];
+// Arrivals, in screen heights. From the first number, as a stretch of the rail is about to
+// fill, the scene finishes coming in by itself: the rail fills, the camera lands and the text
+// comes up, ending where the second number's scroll would have put them. The scroll itself is
+// left alone, and has nothing to move until it passes the second number: that short gap is all
+// that catches a flick's momentum before it carries on out of the scene.
+const arrival = (from, text) => [from + (text[0] - from) * 0.85, text[1]];
+const ARRIVALS = [
+  [S1 * FLIGHT * 0.94, S1 * TEXT_IN[1]],
+  arrival(DIVE[0], TEXT2_IN),
+  arrival(RISE[0], TEXT3_IN),
+  arrival(DIVE4[0], TEXT4_IN),
+  arrival(PAN5[0], TEXT5_IN),
+  arrival(PULL6[0], TEXT6_IN),
+];
+const LET_GO = 0.1; // how far back before an arrival undoes itself, so a nudge back doesn't
+const SNAP = 5; // how quickly the scene closes on the scroll (per second; about 0.6s to land)
 // shares of the way back: everything but the salmon fades from around him, scene 06 comes
 // up out of the dark behind him (slowly, so Finegas and Fionn don't appear at once), the
 // morning comes up, and he fades into the one on the grass
@@ -83,7 +101,6 @@ const SURFACE = new THREE.Color('#2c5a1a');
 const WELL = new THREE.Color('#9cc23a');
 
 const easeIO = gsap.parseEase('power2.inOut');
-const easeOut = gsap.parseEase('power2.out');
 const smoothstep = (a, b, x) => {
   const t = THREE.MathUtils.clamp((x - a) / (b - a), 0, 1);
   return t * t * (3 - 2 * t);
@@ -338,8 +355,8 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     onScene?.(4, smoothstep(TEXT4_IN[0], TEXT4_IN[1], u) * (1 - smoothstep(0, 0.1, pan5)));
     onScene?.(5, smoothstep(TEXT5_IN[0], TEXT5_IN[1], u) * (1 - smoothstep(0, 0.1, pull6)));
     onScene?.(6, smoothstep(TEXT6_IN[0], TEXT6_IN[1], u));
-    // the first dot fills on the way in, the second on the way down, the third on the way
-    // up, the fourth on the way in through the river, the fifth on the way along, the
+    // the rail's first stretch fills on the way in, the second on the way down, the third on
+    // the way up, the fourth on the way in through the river, the fifth on the way along, the
     // sixth on the way back
     onChapter?.(
       pull6 > 0
@@ -451,7 +468,7 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     scene03.setActive(u >= TEXT3_IN[0] && dive4 === 0); // Finegas casts now and then once you've arrived
     fish.under = dive > 0;
     // in from the right, then off to the left as the camera rises
-    fish.k = 1.4 * (1 - easeOut(THREE.MathUtils.clamp((u - FISH_IN[0]) / (FISH_IN[1] - FISH_IN[0]), 0, 1))) - 1.8 * smoothstep(0, 0.5, rise);
+    fish.k = 1.4 * (1 - smoothstep(FISH_IN[0], FISH_IN[1], u)) - 1.8 * smoothstep(0, 0.5, rise);
     // the well lights the counter walls as you come close, and fades once you're past
     const near = Math.min(1, p / SPLIT);
     const peak = (geo.size * 0.6) ** 2 * 0.7; // scales with the letter size so the glow looks the same on every screen
@@ -467,6 +484,26 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     lastFade = a;
   }
   let lastFade = 1;
+
+  // ---- arrivals --------------------------------------------------------------
+  let want = 0; // where the scene should be, in screen heights
+  let arriving = null; // the arrival the scroll is inside
+  let catching = false; // the scene is closing on `want` by itself, each frame
+  function follow(pin) {
+    const u = pin * TOTAL;
+    const was = arriving;
+    if (arriving && (u >= arriving[1] || u < arriving[0] - LET_GO)) arriving = null;
+    arriving ??= ARRIVALS.find(([from, to]) => u >= from && u < to) ?? null;
+    want = arriving ? arriving[1] : u;
+    catching ||= arriving !== was;
+    if (!catching) setProgress(want / TOTAL);
+  }
+  function catchUp(dt) {
+    const at = progress * TOTAL;
+    const next = Math.abs(want - at) < 0.002 ? want : at + (want - at) * (1 - Math.exp(-SNAP * dt));
+    catching = next !== want;
+    setProgress(next / TOTAL);
+  }
 
   // ---- loop ------------------------------------------------------------------
   const clock = new THREE.Clock();
@@ -497,7 +534,9 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
   function placeSalmon(dt) {
     // on the splash: swimming in, then off to the left. Under the pool: swimming back in.
     const pose = fish.under ? poses.under : poses.splash;
-    const k = fish.under ? fish.k : intro.salmon - intro.exit * 1.4; // + right of rest, - left
+    // under the pool he glides after where the scroll puts him, so its steps don't jerk him along
+    fish.at = fish.under ? (fish.at ?? fish.k) + (fish.k - (fish.at ?? fish.k)) * (1 - Math.exp(-FISH_GLIDE * dt)) : null;
+    const k = fish.under ? fish.at : intro.salmon - intro.exit * 1.4; // + right of rest, - left
     const v = dt > 0 ? Math.abs(k - lastK) / dt : 0;
     lastK = k;
     speed += (Math.min(1, v / 0.55) - speed) * Math.min(1, dt * 6);
@@ -532,6 +571,7 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     const rawDt = clock.getDelta();
     watchPace(rawDt);
     const dt = Math.min(rawDt, 0.05);
+    if (catching) catchUp(dt);
     if (uploads.length) renderer.initTexture(uploads.shift()); // one a frame
     salmon.uniforms.uTime.value += dt;
     blink(dt);
@@ -604,8 +644,15 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
         end: `+=${TOTAL * 100}%`,
         pin: true,
         scrub: 0.6,
-        onUpdate: (self) => setProgress(self.progress),
-        onRefresh: (self) => setProgress(self.progress),
+        onUpdate: (self) => follow(self.progress),
+        // a new layout, or a page opened part way down: straight there, with no arrival to watch
+        onRefresh: (self) => {
+          catching = false;
+          arriving = null;
+          follow(self.progress);
+          catching = false;
+          setProgress(want / TOTAL);
+        },
       });
     },
     // jump to where scene 01 is fully in (the Listen / Read buttons)

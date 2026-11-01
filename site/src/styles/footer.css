@@ -149,12 +149,13 @@
   }
 }
 
-/* the chapter dots and pause button make way for the credits */
+/* the chapter progress and pause button make way for the credits */
 .progress,
 .corner {
   transition: opacity 0.4s, visibility 0.4s;
 }
 html.at-end .progress,
+html.at-end .rail,
 html.at-end .corner {
   opacity: 0;
   visibility: hidden;
