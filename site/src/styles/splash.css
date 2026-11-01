@@ -231,22 +231,19 @@
   .scene__copy {
     top: 84px;
   }
-  /* scene 02's salmon swims across the top quarter (Figma: Mobile 02) */
-  .scene__copy[data-scene-copy='2'] {
-    top: 34svh;
+  /* the art fills the top of scenes 02 to 06, so their text stands on the progress bar,
+     however long it runs. On short screens it rises over the art, on its own scrim */
+  .scene__copy:not([data-scene-copy='1']) {
+    top: auto;
+    bottom: calc(var(--edge-y) + 8px + var(--control-h) + 16px);
   }
-  /* scene 03's painting fills the top 45% (Figma: Mobile 03), scenes 04 and 05 about the
-     same (Figma: Mobile 04) */
-  .scene__copy[data-scene-copy='3'] {
-    top: 44svh;
-  }
-  .scene__copy[data-scene-copy='4'],
-  .scene__copy[data-scene-copy='5'] {
-    top: 43svh;
-  }
-  /* scene 06's painting a little shorter, 40%, for its longer text (Figma: Mobile 06) */
-  .scene__copy[data-scene-copy='6'] {
-    top: 38svh;
+  .scene__copy:not([data-scene-copy='1'])::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: -56px calc(-1 * var(--gutter)) calc(-1 * (var(--edge-y) + 8px + var(--control-h) + 16px));
+    background: linear-gradient(180deg, rgb(12 18 11 / 0) 0, rgb(12 18 11 / 0.82) 56px);
+    pointer-events: none;
   }
   .scene__title {
     font-size: 48px;
@@ -256,6 +253,23 @@
   }
   .scene__body {
     font-size: 16px;
+  }
+}
+/* short phones: the longest text has to fit between the top controls and the progress bar */
+@media (max-width: 600px) and (max-height: 700px) {
+  .scene__title {
+    font-size: 40px;
+  }
+  .scene__hook {
+    margin-top: 12px;
+    font-size: 19px;
+  }
+  .scene__rule {
+    margin: 14px 0;
+  }
+  .scene__body {
+    font-size: 15px;
+    line-height: 1.55;
   }
 }
 /* with the zoom on, scene 01 waits under the zoom's final frame */

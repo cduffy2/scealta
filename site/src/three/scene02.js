@@ -161,8 +161,8 @@ export function createScene02() {
   function fishPose(length, height, view, clearX = 0) {
     const d = FISH.depth;
     if (view.w < view.h) {
-      const scale = (view.h * d * 0.25) / height;
-      return { x: -view.w * d * 0.45 + (length * scale) / 2, y: view.h * d * 0.3, z: -d, scale, viewW: view.w * d };
+      const scale = (view.h * d * 0.2) / height;
+      return { x: -view.w * d * 0.45 + (length * scale) / 2, y: view.h * d * 0.33, z: -d, scale, viewW: view.w * d };
     }
     const h = ((FISH.bottom - FISH.top) * d) / FW;
     const scale = h / height;
