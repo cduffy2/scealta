@@ -31,7 +31,7 @@
     </header>
 
     <main>
-      <section class="splash" id="splash" aria-labelledby="splash-title">
+      <section class="splash" id="splash" aria-labelledby="splash-title" tabindex="-1">
         <div class="splash__rain" aria-hidden="true"></div>
         <!-- 3D title, salmon, rain and scene 01 (src/three/), when motion is on -->
         <div class="splash__stage" aria-hidden="true"></div>
@@ -167,6 +167,40 @@
         </div>
       </section>
     </main>
+
+    <!-- Credits (Figma: Footer · Credits, Mobile Footer · Credits) -->
+    <footer class="credits" id="credits">
+      <div class="credits__main">
+        <div class="credits__intro">
+          <p class="label credits__mark"><span class="credits__dot" aria-hidden="true"></span><span data-i18n="documentTitle">The Salmon of Knowledge</span></p>
+          <p class="credits__quote" data-i18n="creditsQuote">Effort doesn’t guarantee success and wisdom often arrives by accident.</p>
+        </div>
+        <div class="credits__grid">
+          <section class="credits__group">
+            <h2 class="label credits__head" data-i18n="creditsSite">Site</h2>
+            <p data-i18n="creditsSiteBody">Designed and developed by Ciarán Duffy</p>
+            <a class="label credits__link" href="https://duff.work" target="_blank" rel="noopener">duff.work<i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
+          </section>
+          <section class="credits__group">
+            <h2 class="label credits__head" data-i18n="creditsStory">Story</h2>
+            <p data-i18n="creditsStoryBody">A retelling of Bradán an Feasa (The Salmon of Knowledge) from the Fenian Cycle, woven with the older tale of Fintan mac Bóchra.</p>
+          </section>
+          <section class="credits__group">
+            <h2 class="label credits__head" data-i18n="creditsType">Type</h2>
+            <p>Gaillimh by Unthink, for Galway 2020</p>
+            <p>BioRhyme by Aoife Mooney</p>
+          </section>
+          <section class="credits__group">
+            <h2 class="label credits__head" data-i18n="creditsArt">Images and sound</h2>
+            <p data-i18n="creditsArtBody">Base illustrations created with Midjourney, original music by Ciarán Duffy</p>
+          </section>
+        </div>
+      </div>
+      <div class="credits__legal">
+        <p class="label label--muted">© 2026 Ciarán Duffy</p>
+        <a class="label credits__link" href="#splash" data-back-to-top><span data-i18n="backToTop">Back to top</span><i data-lucide="arrow-up" aria-hidden="true"></i></a>
+      </div>
+    </footer>
 
     <!-- Chapter progress (src/progress.js): decorative, each scene is a labelled section -->
     <div class="progress label" aria-hidden="true">

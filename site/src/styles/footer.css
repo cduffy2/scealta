@@ -1,0 +1,161 @@
+/* Credits at the end of the story (Figma: Footer · Credits, Mobile Footer · Credits). */
+
+.credits {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+  padding: 72px var(--gutter) 40px;
+  background: var(--peat-black);
+  color: var(--parchment);
+}
+/* the rules above and below the credits */
+.credits::before,
+.credits__legal::before {
+  content: '';
+  display: block;
+  height: 1px;
+  background: var(--line);
+}
+
+.credits__main {
+  display: flex;
+  gap: 64px;
+  align-items: flex-start;
+}
+.credits__intro {
+  display: flex;
+  flex: 0 0 420px;
+  flex-direction: column;
+  gap: 14px;
+}
+.credits__mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+}
+.credits__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--hazelnut);
+}
+.credits__quote {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.4;
+}
+
+.credits__grid {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 40px 48px;
+  min-width: 0;
+}
+.credits__group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+.credits__group p:not(.label) {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.credits__head {
+  color: var(--glow);
+}
+
+.credits__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--parchment);
+  text-decoration: none;
+}
+.credits__link:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.credits__link svg {
+  width: 14px;
+  height: 14px;
+}
+.credits__legal .credits__link {
+  gap: 8px;
+}
+.credits__legal .credits__link svg {
+  width: var(--icon);
+  height: var(--icon);
+}
+
+.credits__legal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.credits__legal::before {
+  flex: 0 0 100%;
+  margin-bottom: 30px; /* 48px from the rule to the legal line, as the gap above it */
+}
+
+/* narrower screens: the quote above the credits */
+@media (max-width: 1100px) {
+  .credits__main {
+    flex-direction: column;
+    gap: 48px;
+  }
+  .credits__intro {
+    flex-basis: auto;
+    max-width: 560px;
+  }
+  .credits__grid {
+    width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .credits {
+    gap: 36px;
+    padding: 56px var(--gutter) 32px;
+  }
+  .credits__main {
+    gap: 36px;
+  }
+  .credits__grid {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+  .credits__legal {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .credits__legal::before {
+    margin-bottom: 18px; /* 36px from the rule */
+  }
+  /* back to the top first, the copyright last */
+  .credits__legal .credits__link {
+    order: -1;
+  }
+  .credits__legal::before {
+    order: -2;
+    flex: none;
+    align-self: stretch;
+  }
+}
+
+/* the chapter dots and pause button make way for the credits */
+.progress,
+.corner {
+  transition: opacity 0.4s, visibility 0.4s;
+}
+html.at-end .progress,
+html.at-end .corner {
+  opacity: 0;
+  visibility: hidden;
+}

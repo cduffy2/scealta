@@ -32,6 +32,15 @@ export const strings = {
     s06Title: 'The Teacher',
     s06Hook: 'It is the fate of all teachers that their students must one day surpass them.',
     s06Body: 'This is the part the story does not always tell. Finegas did not fight it. He gave the boy the rest of the fish. Fionn grew up to lead the Fianna, the greatest warriors in Ireland. In the end, Finegas understood that passing on what he knew was the same as having it.',
+    creditsQuote: 'Effort doesn’t guarantee success and wisdom often arrives by accident.',
+    creditsSite: 'Site',
+    creditsSiteBody: 'Designed and developed by Ciarán Duffy',
+    creditsStory: 'Story',
+    creditsStoryBody: 'A retelling of Bradán an Feasa (The Salmon of Knowledge) from the Fenian Cycle, woven with the older tale of Fintan mac Bóchra.',
+    creditsType: 'Type',
+    creditsArt: 'Images and sound',
+    creditsArtBody: 'Base illustrations created with Midjourney, original music by Ciarán Duffy',
+    backToTop: 'Back to top',
   },
   ga: {
     title: 'Bra[d]án\nan Feasa',
@@ -64,6 +73,16 @@ export const strings = {
     s06Title: 'An Múinteoir',
     s06Hook: 'It is the fate of all teachers that their students must one day surpass them.',
     s06Body: 'This is the part the story does not always tell. Finegas did not fight it. He gave the boy the rest of the fish. Fionn grew up to lead the Fianna, the greatest warriors in Ireland. In the end, Finegas understood that passing on what he knew was the same as having it.',
+    // the credits' longer lines also wait on the translation
+    creditsQuote: 'Effort doesn’t guarantee success and wisdom often arrives by accident.',
+    creditsSite: 'Suíomh',
+    creditsSiteBody: 'Designed and developed by Ciarán Duffy',
+    creditsStory: 'Scéal',
+    creditsStoryBody: 'A retelling of Bradán an Feasa (The Salmon of Knowledge) from the Fenian Cycle, woven with the older tale of Fintan mac Bóchra.',
+    creditsType: 'Cló',
+    creditsArt: 'Íomhánna agus fuaim',
+    creditsArtBody: 'Base illustrations created with Midjourney, original music by Ciarán Duffy',
+    backToTop: 'Ar ais go barr',
   },
 };
 

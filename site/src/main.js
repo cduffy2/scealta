@@ -1,7 +1,7 @@
 import { inject } from '@vercel/analytics';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { createIcons, VolumeX, Volume2, Headphones, BookOpen, Pause, Play, ArrowDown, ChevronRight } from 'lucide';
+import { createIcons, VolumeX, Volume2, Headphones, BookOpen, Pause, Play, ArrowDown, ArrowUp, ArrowUpRight, ChevronRight } from 'lucide';
 import { state, save } from './state.js';
 import { strings, applyStrings } from './i18n.js';
 import { buildTitle, fontsReady, animateTitle, showTitle } from './title.js';
@@ -13,7 +13,7 @@ inject();
 
 gsap.registerPlugin(ScrollTrigger);
 
-const icons = { VolumeX, Volume2, Headphones, BookOpen, Pause, Play, ArrowDown, ChevronRight };
+const icons = { VolumeX, Volume2, Headphones, BookOpen, Pause, Play, ArrowDown, ArrowUp, ArrowUpRight, ChevronRight };
 const root = document.documentElement;
 const soundBtn = document.querySelector('[data-control="sound"]');
 const motionBtn = document.querySelector('[data-control="motion"]');
@@ -157,6 +157,16 @@ for (const b of document.querySelectorAll('[data-choose]')) {
     target.focus({ preventScroll: true });
   });
 }
+
+// ---- Credits ---------------------------------------------------------------
+// The chapter dots and pause button make way once the credits are in view, and the link
+// at the bottom goes back to the title (the pinned 3D journey included).
+new IntersectionObserver(([e]) => root.classList.toggle('at-end', e.isIntersecting)).observe(document.getElementById('credits'));
+document.querySelector('[data-back-to-top]').addEventListener('click', (e) => {
+  e.preventDefault();
+  window.scrollTo({ top: 0, behavior: state.motion === 'off' ? 'auto' : 'smooth' });
+  splash.focus({ preventScroll: true });
+});
 
 // ---- Rain ------------------------------------------------------------------
 function makeRain() {
