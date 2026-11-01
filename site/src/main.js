@@ -1,4 +1,5 @@
 import { inject } from '@vercel/analytics';
+import { injectSpeedInsights } from '@vercel/speed-insights';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { createIcons, VolumeX, Volume2, Headphones, BookOpen, Pause, Play, ArrowDown, ArrowUp, ArrowUpRight, ChevronRight } from 'lucide';
@@ -8,8 +9,9 @@ import { buildTitle, fontsReady, animateTitle, showTitle } from './title.js';
 import { createPortal } from './portal.js';
 import { createProgress } from './progress.js';
 
-// Initialize Vercel Web Analytics
+// Initialize Vercel Web Analytics, and real visitors' load and response times
 inject();
+injectSpeedInsights();
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -66,13 +68,35 @@ function trackScenes(on) {
     );
 }
 
-const webgl = (() => {
+// A browser with no usable GPU draws in software, far too slowly for the 3D: it gets the
+// flat version. ?3d=force skips that check, to test the 3D path on such a machine. Too slow
+// to answer counts as no GPU. A browser the worker can't test in is asked here instead,
+// which is quick wherever there is no software fallback to start up.
+const gpu = new Promise((resolve) => {
+  const direct = () => {
+    try {
+      resolve(!!document.createElement('canvas').getContext('webgl2'));
+    } catch {
+      resolve(false);
+    }
+  };
+  let worker;
   try {
-    return !!document.createElement('canvas').getContext('webgl2');
+    worker = new Worker(new URL('./gpu.worker.js', import.meta.url), { type: 'module' });
   } catch {
-    return false;
+    return direct();
   }
-})();
+  const timer = setTimeout(() => done(false), 2000);
+  const done = (answer) => {
+    clearTimeout(timer);
+    worker.terminate();
+    if (answer === null) direct();
+    else resolve(answer);
+  };
+  worker.onmessage = (e) => done(e.data);
+  worker.onerror = () => done(null);
+  worker.postMessage(new URLSearchParams(location.search).get('3d') === 'force');
+});
 
 function setIcon(button, name) {
   const old = button.querySelector('svg, i');
@@ -198,7 +222,7 @@ function showPortal(animate) {
 const FADE = ['.splash__salmon', '.splash__choice', '.splash__rain'];
 
 function startDOM({ animate }) {
-  root.classList.remove('is-3d');
+  root.classList.remove('is-3d', 'flat-off');
   portal ??= createPortal({
     splash,
     title: titleEl,
@@ -295,8 +319,8 @@ async function start3D({ animate }) {
 
 async function setupTitle({ animate }) {
   title = buildTitle(titleEl, strings[state.lang].title);
-  await fontsReady();
-  if (state.motion === 'on' && webgl && (await start3D({ animate }))) return;
+  const [hasGPU] = await Promise.all([gpu, fontsReady()]);
+  if (state.motion === 'on' && hasGPU && (await start3D({ animate }))) return;
   startDOM({ animate: animate && state.motion === 'on' });
 }
 

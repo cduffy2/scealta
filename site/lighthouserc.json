@@ -1,0 +1,76 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "npm run preview -- --port 4173 --strictPort",
+      "startServerReadyPattern": "Local",
+      "url": [
+        "http://localhost:4173/",
+        "http://localhost:4173/?3d=force"
+      ],
+      "numberOfRuns": 3,
+      "settings": {
+        "chromeFlags": "--no-sandbox --use-angle=swiftshader --enable-unsafe-swiftshader"
+      }
+    },
+    "assert": {
+      "assertMatrix": [
+        {
+          "matchingUrlPattern": "localhost:4173/$",
+          "assertions": {
+            "categories:performance": [
+              "error",
+              {
+                "minScore": 0.5,
+                "aggregationMethod": "median"
+              }
+            ],
+            "total-blocking-time": [
+              "error",
+              {
+                "maxNumericValue": 2000,
+                "aggregationMethod": "median"
+              }
+            ],
+            "largest-contentful-paint": [
+              "error",
+              {
+                "maxNumericValue": 8000,
+                "aggregationMethod": "median"
+              }
+            ],
+            "cumulative-layout-shift": [
+              "error",
+              {
+                "maxNumericValue": 0.05,
+                "aggregationMethod": "median"
+              }
+            ],
+            "total-byte-weight": [
+              "error",
+              {
+                "maxNumericValue": 1700000,
+                "aggregationMethod": "median"
+              }
+            ]
+          }
+        },
+        {
+          "matchingUrlPattern": "3d=force",
+          "assertions": {
+            "total-byte-weight": [
+              "error",
+              {
+                "maxNumericValue": 4400000,
+                "aggregationMethod": "median"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "upload": {
+      "target": "filesystem",
+      "outputDir": ".lighthouseci/reports"
+    }
+  }
+}

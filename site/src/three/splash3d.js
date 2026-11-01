@@ -3,12 +3,12 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { loadFonts, buildTitle3D, setLetterReveal, disposeTitle3D } from './title3d.js';
 import { loadSalmon, createSwim, SALMON_LENGTH, SALMON_HEIGHT } from './salmon3d.js';
-import { loadScene01, IMG, PLATE_DEPTH } from './scene01.js';
-import { loadScene02 } from './scene02.js';
-import { loadScene03 } from './scene03.js';
-import { loadScene04 } from './scene04.js';
-import { loadScene05 } from './scene05.js';
-import { loadScene06 } from './scene06.js';
+import { createScene01, IMG, PLATE_DEPTH } from './scene01.js';
+import { createScene02 } from './scene02.js';
+import { createScene03 } from './scene03.js';
+import { createScene04 } from './scene04.js';
+import { createScene05 } from './scene05.js';
+import { createScene06 } from './scene06.js';
 import { createRain } from './rain3d.js';
 
 // The splash in 3D. World layout (camera never rotates, always looks down -z):
@@ -90,19 +90,19 @@ const smoothstep = (a, b, x) => {
 };
 
 export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl, fade, onScene, onChapter }) {
-  const [font, salmon, scene01, scene02, scene03, scene04, scene05, scene06] = await Promise.all([
-    loadFonts(),
-    loadSalmon(),
-    loadScene01(),
-    loadScene02(),
-    loadScene03(),
-    loadScene04(),
-    loadScene05(),
-    loadScene06(),
-  ]);
+  // Only the title and the salmon hold up the opening. The scenes are built now, and their
+  // images come in later (see the stages below).
+  const [font, salmon] = await Promise.all([loadFonts(), loadSalmon()]);
+  const scene01 = createScene01();
+  const scene02 = createScene02();
+  const scene03 = createScene03();
+  const scene04 = createScene04();
+  const scene05 = createScene05();
+  const scene06 = createScene06();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, stencil: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  const fullRatio = Math.min(window.devicePixelRatio, 2);
+  renderer.setPixelRatio(fullRatio);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setClearColor(0x000000, 0);
   host.append(renderer.domElement);
@@ -148,6 +148,51 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
   let poses = null; // the salmon's place on the splash and in scene 02
   let entry = null; // where Finegas's line goes into the river (world), once the way in to scene 04 starts
   let trigger = null;
+
+  // ---- stages ----------------------------------------------------------------
+  // Scene 01 is dark at rest, so its images follow once the page has settled, ready for the
+  // first scroll. The rest wait for a sign of the reader, then come in one scene at a time,
+  // the nearest first. A scene stays hidden until its images are all here.
+  const ready = new Set();
+  const uploads = [];
+  let destroyed = false;
+  const prepare = async (s) => {
+    try {
+      await s.assets.load();
+      if (destroyed) return;
+      // shaders and textures go up ahead of time, so a scene's arrival doesn't stall a frame
+      for (const root of s.roots) await renderer.compileAsync(root, camera, scene);
+      if (destroyed) return;
+      uploads.push(...s.assets.textures);
+      ready.add(s);
+      setProgress(progress);
+    } catch (e) {
+      console.warn('Scene unavailable:', e);
+    }
+  };
+  const later = [
+    [scene02, RISE[1]],
+    [scene03, DIVE4[1]],
+    [scene04, PAN5[1]],
+    [scene05, PULL6[1]],
+    [scene06, TOTAL],
+  ];
+  const WAKE = ['scroll', 'wheel', 'touchstart', 'pointerdown', 'keydown'];
+  let woken = false;
+  const wake = async () => {
+    if (woken) return;
+    woken = true;
+    for (const e of WAKE) window.removeEventListener(e, wake);
+    while (later.length && !destroyed) {
+      const u = progress * TOTAL;
+      const i = Math.max(0, later.findIndex(([, end]) => end >= u)); // a scene not yet left behind
+      const [[s]] = later.splice(i, 1);
+      await prepare(s);
+    }
+  };
+  for (const e of WAKE) window.addEventListener(e, wake, { passive: true });
+  const whenIdle = window.requestIdleCallback ?? ((fn) => setTimeout(fn, 200));
+  whenIdle(() => destroyed || prepare(scene01), { timeout: 1500 });
 
   // ---- layout ----------------------------------------------------------------
   function layout() {
@@ -379,14 +424,16 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     scene01.setRise(dive > 0 ? 1 - smoothstep(0, 0.4, dive) : smoothstep(SPLIT + 0.04, 0.97, p));
     const through = camera.position.z < TITLE_Z;
     scene01.setMasked(!through);
-    scene01.setBrightness(smoothstep(0.04, SPLIT * 0.8, p)); // hidden at rest, fades up as you scroll in
+    const scene01Bright = smoothstep(0.04, SPLIT * 0.8, p);
+    scene01.setBrightness(scene01Bright); // hidden at rest, fades up as you scroll in
     scene01.setRippleFade(1 - 0.85 * smoothstep(0.2, 0.75, dive)); // calm before the plunge
     scene01.setNuts(p >= 0.99 && dive === 0); // hazelnuts drop now and then while you rest on scene 01
     mask.visible = !through;
     // through the surface: scene 01 is behind now, scene 02 opens up around the camera
     const z = camera.position.z;
     const under = z < -PLATE_DEPTH;
-    scene01.group.visible = !under;
+    scene01.group.visible = !under && ready.has(scene01) && scene01Bright > 0;
+    scene01.foreground.visible &&= ready.has(scene01);
     rain.mesh.visible = z > -PLATE_DEPTH + 1;
     scene02.setBrightness(smoothstep(-PLATE_DEPTH + 1.2, -PLATE_DEPTH - 0.4, z));
     // the leaves part outwards again as the camera starts up
@@ -396,10 +443,11 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     // scene 03 needs none: the river fades into the water below it)
     surface.material.opacity = 1 - smoothstep(0.15, 2.4, Math.abs(z + PLATE_DEPTH));
     scene03.group.visible = rise > 0 && reveal4 < 1;
-    if (dive4 > 0) scene02.group.visible = scene02.front.visible = false; // its water would cover the catch
-    scene04.group.visible = reveal4 > 0 && pan5 < 1;
-    scene05.group.visible = pan5 > 0 && pull6 < SETTLE6[1];
-    scene06.group.visible = pull6 > 0;
+    if (dive4 > 0 || !ready.has(scene02)) scene02.group.visible = scene02.front.visible = false; // its water would cover the catch
+    scene03.group.visible &&= ready.has(scene03);
+    scene04.group.visible = reveal4 > 0 && pan5 < 1 && ready.has(scene04);
+    scene05.group.visible = pan5 > 0 && pull6 < SETTLE6[1] && ready.has(scene05);
+    scene06.group.visible = pull6 > 0 && ready.has(scene06);
     scene03.setActive(u >= TEXT3_IN[0] && dive4 === 0); // Finegas casts now and then once you've arrived
     fish.under = dive > 0;
     // in from the right, then off to the left as the camera rises
@@ -461,13 +509,35 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     g.rotation.y = o.yaw;
   }
 
+  // Sharpness gives way once if a device can't keep up: after a run of slow frames the canvas
+  // drops to a lower pixel ratio, and it never drops on a device that can. Not counted: the
+  // opening seconds and uploads, which are slow anywhere, and long gaps, which are pauses.
+  const SLOW = 22; // ms, averaged over a run of frames
+  const RUN = 60;
+  let eased = fullRatio <= 1.5;
+  let slowSum = 0;
+  let slowCount = 0;
+  function watchPace(rawDt) {
+    if (eased || clock.elapsedTime < 3 || uploads.length || rawDt > 0.25) return;
+    slowSum += rawDt * 1000;
+    if (++slowCount < RUN) return;
+    if (slowSum / slowCount > SLOW) {
+      eased = true;
+      renderer.setPixelRatio(1.5);
+    }
+    slowSum = slowCount = 0;
+  }
+
   function frame() {
-    const dt = Math.min(clock.getDelta(), 0.05);
+    const rawDt = clock.getDelta();
+    watchPace(rawDt);
+    const dt = Math.min(rawDt, 0.05);
+    if (uploads.length) renderer.initTexture(uploads.shift()); // one a frame
     salmon.uniforms.uTime.value += dt;
     blink(dt);
     placeSalmon(dt);
-    scene01.tick(dt);
-    scene02.tick(dt);
+    if (scene01.group.visible) scene01.tick(dt);
+    if (scene02.group.visible) scene02.tick(dt);
     if (scene03.group.visible) scene03.tick(dt);
     if (scene04.group.visible) scene04.tick(dt);
     if (scene05.group.visible) scene05.tick(dt);
@@ -526,6 +596,8 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     relayout: layout,
     enableZoom() {
       if (trigger) return;
+      // opened part way down: the reader is already in the story
+      if (window.scrollY > 0) requestAnimationFrame(wake);
       trigger = ScrollTrigger.create({
         trigger: splash,
         start: 'top top',
@@ -542,6 +614,8 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
       window.scrollTo({ top: trigger.start + (trigger.end - trigger.start) * ((LANDED * S1) / TOTAL), behavior });
     },
     destroy() {
+      destroyed = true;
+      for (const e of WAKE) window.removeEventListener(e, wake);
       trigger?.kill(true);
       trigger = null;
       gsap.set(fade, { clearProps: 'opacity,visibility' });

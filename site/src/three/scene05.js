@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import meta from './s05-fire.json';
+import { createAssets } from './assets.js';
 
 // Scene 05, the thumb: Fionn roasting the salmon over the fire at night, by the water. The
 // painting (mirrored, so the salmon lies on the right, clear of the text) is in three layers
@@ -58,23 +59,21 @@ const glow = (color, falloff = 2.0) =>
       }`,
   });
 
-export async function loadScene05() {
-  const loader = new THREE.TextureLoader();
-  const load = async (url, color = true) => {
-    const t = await loader.loadAsync(url);
+export function createScene05() {
+  const assets = createAssets();
+  const load = (url, color = true) => {
+    const t = assets.texture(url);
     if (color) t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 4;
     return t;
   };
   const size = window.innerWidth < 1000 ? 1600 : 2912;
-  const [skyTex, treesTex, nearTex, flamesTex, fishTex, handTex] = await Promise.all([
-    load(`/images/s05/sky-${size}.webp`),
-    load(`/images/s05/trees-${size}.webp`),
-    load(`/images/s05/near-${size}.webp`),
-    load('/images/s05/flames.webp', false),
-    load('/images/s05/fish.webp', false),
-    load('/images/s05/hand.webp'),
-  ]);
+  const skyTex = load(`/images/s05/sky-${size}.webp`);
+  const treesTex = load(`/images/s05/trees-${size}.webp`);
+  const nearTex = load(`/images/s05/near-${size}.webp`);
+  const flamesTex = load('/images/s05/flames.webp', false);
+  const fishTex = load('/images/s05/fish.webp', false);
+  const handTex = load('/images/s05/hand.webp');
 
   const group = new THREE.Group();
   // each layer is the painting's frame (D wide, centred) at its own depth
@@ -635,7 +634,7 @@ export async function loadScene05() {
 
   tick(0);
   return {
-    group,
+    assets, roots: [group], group,
     layout,
     tick,
     // the near painting's left (-1) or right (+1) edge, in the group's space

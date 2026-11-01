@@ -6,8 +6,21 @@
     <title>The Salmon of Knowledge · Scéalta</title>
     <meta name="description" content="An illustrated retelling of Bradán an Feasa, the Irish myth of the Salmon of Knowledge, in six scenes." />
     <meta name="theme-color" content="#050A06" />
-    <link rel="preload" href="/fonts/gaillimh-black.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/gaillimh-medium.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/gaillimh-thin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/gaillimh-light.woff2" as="font" type="font/woff2" crossorigin />
+    <script>
+      // Set before the page below is parsed, so the flat images never start downloading when
+      // the 3D version is likely to run. Only cheap checks here: a test GL context would hold
+      // up the first paint. main.js makes the real test, and startDOM undoes this if it fails.
+      (function () {
+        var motion;
+        try {
+          motion = (JSON.parse(localStorage.getItem('bradan-prefs')) || {}).motion;
+        } catch (e) {}
+        var on = (motion || (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'off' : 'on')) === 'on';
+        if (on && window.WebGL2RenderingContext) document.documentElement.classList.add('flat-off');
+      })();
+    </script>
     <link rel="stylesheet" href="/src/styles/main.css" />
   </head>
   <body>
@@ -39,8 +52,8 @@
         <!-- Scene 01, seen through the counter of the title's portal letter -->
         <div class="portal" aria-hidden="true">
           <picture>
-            <source type="image/avif" srcset="/images/s01-960.avif 960w, /images/s01-1600.avif 1600w, /images/s01-2400.avif 2400w, /images/s01-2912.avif 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" />
-            <img class="portal__img" src="/images/s01-1600.webp" srcset="/images/s01-960.webp 960w, /images/s01-1600.webp 1600w, /images/s01-2400.webp 2400w, /images/s01-2912.webp 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" width="2912" height="1632" alt="" />
+            <source type="image/avif" srcset="/images/s01-960.avif 960w, /images/s01-1600.avif 1600w, /images/s01-2400.avif 2400w, /images/s01-2912.avif 2912w" sizes="(max-width: 999px) 800px, (max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" />
+            <img class="portal__img" src="/images/s01-1600.webp" srcset="/images/s01-960.webp 960w, /images/s01-1600.webp 1600w, /images/s01-2400.webp 2400w, /images/s01-2912.webp 2912w" sizes="(max-width: 999px) 800px, (max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" width="2912" height="1632" loading="lazy" alt="" />
           </picture>
         </div>
 
@@ -79,8 +92,8 @@
       <!-- Scenes arrive one at a time. Scene 01's frame is the end of the portal zoom. -->
       <section class="scene scene--first" id="scene-01" aria-label="Scene 1, The Well" tabindex="-1">
         <picture>
-          <source type="image/avif" srcset="/images/s01-960.avif 960w, /images/s01-1600.avif 1600w, /images/s01-2400.avif 2400w, /images/s01-2912.avif 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" />
-          <img class="scene__img" src="/images/s01-1600.webp" srcset="/images/s01-960.webp 960w, /images/s01-1600.webp 1600w, /images/s01-2400.webp 2400w, /images/s01-2912.webp 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" width="2912" height="1632" alt="Seen from above at night, a woodland pool glows beneath its surface, ringed by dark trees in the falling rain." />
+          <source type="image/avif" srcset="/images/s01-960.avif 960w, /images/s01-1600.avif 1600w, /images/s01-2400.avif 2400w, /images/s01-2912.avif 2912w" sizes="(max-width: 999px) 800px, (max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" />
+          <img class="scene__img" src="/images/s01-1600.webp" srcset="/images/s01-960.webp 960w, /images/s01-1600.webp 1600w, /images/s01-2400.webp 2400w, /images/s01-2912.webp 2912w" sizes="(max-width: 999px) 800px, (max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" width="2912" height="1632" loading="lazy" alt="Seen from above at night, a woodland pool glows beneath its surface, ringed by dark trees in the falling rain." />
         </picture>
         <div class="scene__scrim" aria-hidden="true" data-scene-copy="1"></div>
         <!-- In 3D mode this copy is moved onto the splash, over the live scene -->
@@ -95,8 +108,8 @@
       <!-- In 3D the camera dives through scene 01's pool into this one (src/three/scene02.js) -->
       <section class="scene" id="scene-02" aria-label="Scene 2, The First Man" tabindex="-1">
         <picture>
-          <source type="image/avif" srcset="/images/s02-960.avif 960w, /images/s02-1600.avif 1600w, /images/s02-2400.avif 2400w, /images/s02-2912.avif 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" />
-          <img class="scene__img" src="/images/s02-1600.webp" srcset="/images/s02-960.webp 960w, /images/s02-1600.webp 1600w, /images/s02-2400.webp 2400w, /images/s02-2912.webp 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" width="2912" height="1632" loading="lazy" alt="Underwater in the dark, a great salmon drawn in fine green lines swims among drifting hazelnuts, framed by hazel leaves." />
+          <source type="image/avif" srcset="/images/s02-960.avif 960w, /images/s02-1600.avif 1600w, /images/s02-2400.avif 2400w, /images/s02-2912.avif 2912w" sizes="(max-width: 999px) 800px, (max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" />
+          <img class="scene__img" src="/images/s02-1600.webp" srcset="/images/s02-960.webp 960w, /images/s02-1600.webp 1600w, /images/s02-2400.webp 2400w, /images/s02-2912.webp 2912w" sizes="(max-width: 999px) 800px, (max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" width="2912" height="1632" loading="lazy" alt="Underwater in the dark, a great salmon drawn in fine green lines swims among drifting hazelnuts, framed by hazel leaves." />
         </picture>
         <div class="scene__scrim" aria-hidden="true" data-scene-copy="2"></div>
         <div class="scene__copy" data-scene-copy="2">
@@ -110,8 +123,8 @@
       <!-- In 3D the camera rises from scene 02 up through the water to this one (src/three/scene03.js) -->
       <section class="scene" id="scene-03" aria-label="Scene 3, The Poet" tabindex="-1">
         <picture>
-          <source type="image/avif" srcset="/images/s03-960.avif 960w, /images/s03-1600.avif 1600w, /images/s03-2400.avif 2400w, /images/s03-2912.avif 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" />
-          <img class="scene__img" src="/images/s03-1600.webp" srcset="/images/s03-960.webp 960w, /images/s03-1600.webp 1600w, /images/s03-2400.webp 2400w, /images/s03-2912.webp 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" width="2912" height="1632" loading="lazy" alt="On a mossy riverbank beneath tall rounded trees, an old man in a brown coat fishes the dark river with a long, bending rod." />
+          <source type="image/avif" srcset="/images/s03-960.avif 960w, /images/s03-1600.avif 1600w, /images/s03-2400.avif 2400w, /images/s03-2912.avif 2912w" sizes="(max-width: 999px) 800px, (max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" />
+          <img class="scene__img" src="/images/s03-1600.webp" srcset="/images/s03-960.webp 960w, /images/s03-1600.webp 1600w, /images/s03-2400.webp 2400w, /images/s03-2912.webp 2912w" sizes="(max-width: 999px) 800px, (max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" width="2912" height="1632" loading="lazy" alt="On a mossy riverbank beneath tall rounded trees, an old man in a brown coat fishes the dark river with a long, bending rod." />
         </picture>
         <div class="scene__scrim" aria-hidden="true" data-scene-copy="3"></div>
         <div class="scene__copy" data-scene-copy="3">
@@ -125,8 +138,8 @@
       <!-- In 3D the camera follows Finegas's line down into the river to this one (src/three/scene04.js) -->
       <section class="scene" id="scene-04" aria-label="Scene 4, The Catch" tabindex="-1">
         <picture>
-          <source type="image/avif" srcset="/images/s04-960.avif 960w, /images/s04-1600.avif 1600w, /images/s04-2400.avif 2400w, /images/s04-2912.avif 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" />
-          <img class="scene__img" src="/images/s04-1600.webp" srcset="/images/s04-960.webp 960w, /images/s04-1600.webp 1600w, /images/s04-2400.webp 2400w, /images/s04-2912.webp 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" width="2912" height="1632" loading="lazy" alt="At night beneath a small moon, a great green salmon leaps from glowing golden water, a fishing line hooked in his jaw, drops of water falling around him." />
+          <source type="image/avif" srcset="/images/s04-960.avif 960w, /images/s04-1600.avif 1600w, /images/s04-2400.avif 2400w, /images/s04-2912.avif 2912w" sizes="(max-width: 999px) 800px, (max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" />
+          <img class="scene__img" src="/images/s04-1600.webp" srcset="/images/s04-960.webp 960w, /images/s04-1600.webp 1600w, /images/s04-2400.webp 2400w, /images/s04-2912.webp 2912w" sizes="(max-width: 999px) 800px, (max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" width="2912" height="1632" loading="lazy" alt="At night beneath a small moon, a great green salmon leaps from glowing golden water, a fishing line hooked in his jaw, drops of water falling around him." />
         </picture>
         <div class="scene__scrim" aria-hidden="true" data-scene-copy="4"></div>
         <div class="scene__copy" data-scene-copy="4">
@@ -140,8 +153,8 @@
       <!-- In 3D the camera pans along from the catch to this one (src/three/scene05.js) -->
       <section class="scene" id="scene-05" aria-label="Scene 5, The Thumb" tabindex="-1">
         <picture>
-          <source type="image/avif" srcset="/images/s05-960.avif 960w, /images/s05-1600.avif 1600w, /images/s05-2400.avif 2400w, /images/s05-2912.avif 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" />
-          <img class="scene__img" src="/images/s05-1600.webp" srcset="/images/s05-960.webp 960w, /images/s05-1600.webp 1600w, /images/s05-2400.webp 2400w, /images/s05-2912.webp 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" width="2912" height="1632" loading="lazy" alt="At night by the water, a great salmon roasts on a grill over a row of bright flames, embers rising into the dark trees, as a hand reaches in from the right with a stick to prod it." />
+          <source type="image/avif" srcset="/images/s05-960.avif 960w, /images/s05-1600.avif 1600w, /images/s05-2400.avif 2400w, /images/s05-2912.avif 2912w" sizes="(max-width: 999px) 800px, (max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" />
+          <img class="scene__img" src="/images/s05-1600.webp" srcset="/images/s05-960.webp 960w, /images/s05-1600.webp 1600w, /images/s05-2400.webp 2400w, /images/s05-2912.webp 2912w" sizes="(max-width: 999px) 800px, (max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" width="2912" height="1632" loading="lazy" alt="At night by the water, a great salmon roasts on a grill over a row of bright flames, embers rising into the dark trees, as a hand reaches in from the right with a stick to prod it." />
         </picture>
         <div class="scene__scrim" aria-hidden="true" data-scene-copy="5"></div>
         <div class="scene__copy" data-scene-copy="5">
@@ -155,8 +168,8 @@
       <!-- In 3D the camera pulls back from the salmon on the fire to this one (src/three/scene06.js) -->
       <section class="scene" id="scene-06" aria-label="Scene 6, The Teacher" tabindex="-1">
         <picture>
-          <source type="image/avif" srcset="/images/s06-960.avif 960w, /images/s06-1600.avif 1600w, /images/s06-2400.avif 2400w, /images/s06-2912.avif 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" />
-          <img class="scene__img" src="/images/s06-1600.webp" srcset="/images/s06-960.webp 960w, /images/s06-1600.webp 1600w, /images/s06-2400.webp 2400w, /images/s06-2912.webp 2912w" sizes="(max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" width="2912" height="1632" loading="lazy" alt="In the morning among rounded green hills, an old man with long pale hair and a boy sit side by side on the grass, seen from behind, a cooked salmon beside them and a stone hut with a turf roof nearby." />
+          <source type="image/avif" srcset="/images/s06-960.avif 960w, /images/s06-1600.avif 1600w, /images/s06-2400.avif 2400w, /images/s06-2912.avif 2912w" sizes="(max-width: 999px) 800px, (max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" />
+          <img class="scene__img" src="/images/s06-1600.webp" srcset="/images/s06-960.webp 960w, /images/s06-1600.webp 1600w, /images/s06-2400.webp 2400w, /images/s06-2912.webp 2912w" sizes="(max-width: 999px) 800px, (max-aspect-ratio: 16/9) calc(100svh * 16 / 9), 100vw" width="2912" height="1632" loading="lazy" alt="In the morning among rounded green hills, an old man with long pale hair and a boy sit side by side on the grass, seen from behind, a cooked salmon beside them and a stone hut with a turf roof nearby." />
         </picture>
         <div class="scene__scrim" aria-hidden="true" data-scene-copy="6"></div>
         <div class="scene__copy" data-scene-copy="6">

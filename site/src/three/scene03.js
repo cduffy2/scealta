@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { BG } from './scene02.js';
 import finegas from './s03-finegas.json';
 import { ribbon as markRibbon, ringMaterial } from './marks.js';
+import { createAssets } from './assets.js';
 
 // Scene 03, on the riverbank above the water: Finegas fishing. The painting is a plate with
 // his rod and line painted out (scripts/s03_plate.py); both are drawn live here, and every
@@ -116,11 +117,10 @@ function turn([x, y], [px, py], deg) {
 }
 const handAt = (pose) => turn(turn(turn([HANDS.x, HANDS.y], ELBOW, pose.elbow), SHOULDER, pose.arm), HIP, pose.lean);
 
-export async function loadScene03() {
-  const [tex, waterTex] = await Promise.all([
-    new THREE.TextureLoader().loadAsync(`/images/s03-norod-${window.innerWidth < 1000 ? 1600 : 2912}.webp`),
-    new THREE.TextureLoader().loadAsync('/images/s03/water.webp'),
-  ]);
+export function createScene03() {
+  const assets = createAssets();
+  const tex = assets.texture(`/images/s03-norod-${window.innerWidth < 1000 ? 1600 : 2912}.webp`);
+  const waterTex = assets.texture('/images/s03/water.webp');
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
   tex.wrapT = THREE.MirroredRepeatWrapping;
@@ -181,13 +181,13 @@ export async function loadScene03() {
   art.add(plate);
 
   // Finegas: upper body (pivots at the hips) and arm (at the shoulder, riding on the body)
-  const loader = new THREE.TextureLoader();
-  const layerTex = async (name) => {
-    const t = await loader.loadAsync(`/images/s03/${name}.webp`);
+  const layerTex = (name) => {
+    const t = assets.texture(`/images/s03/${name}.webp`);
     t.colorSpace = THREE.SRGBColorSpace;
     return t;
   };
-  const [torsoTex, armTex] = await Promise.all([layerTex('torso'), layerTex('arm')]);
+  const torsoTex = layerTex('torso');
+  const armTex = layerTex('arm');
   const sprite = (tex, box, pivot, order) => {
     const m = new THREE.Mesh(
       new THREE.PlaneGeometry((box.w * D) / PW, (box.h * D) / PW),
@@ -550,7 +550,7 @@ export async function loadScene03() {
   }
 
   return {
-    group,
+    assets, roots: [group], group,
     layout,
     tick,
     // casts now and then only while he's in view and the reader has arrived

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import meta from './s06-teacher.json';
+import { createAssets } from './assets.js';
 
 // Scene 06, the teacher: the next morning, Finegas and Fionn sit on the grass by the hut,
 // the rest of the salmon beside them. The camera pulls back to it from scene 05: scene 05
@@ -55,22 +56,20 @@ const FLOCK = [
   { path: [[1815, 268], [1935, 306]], scale: 0.8, at: 30 },
 ];
 
-export async function loadScene06() {
-  const loader = new THREE.TextureLoader();
-  const load = async (url, color = true) => {
-    const t = await loader.loadAsync(url);
+export function createScene06() {
+  const assets = createAssets();
+  const load = (url, color = true) => {
+    const t = assets.texture(url);
     if (color) t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 4;
     return t;
   };
   const size = window.innerWidth < 1000 ? 1600 : 2912;
-  const [tex, maskTex, fionnTex, finegasTex, sheepTex] = await Promise.all([
-    load(`/images/s06-plate-${size}.webp`),
-    load('/images/s06/mask.webp', false),
-    load('/images/s06/fionn.webp'),
-    load('/images/s06/finegas.webp'),
-    load('/images/s06/sheep.webp'),
-  ]);
+  const tex = load(`/images/s06-plate-${size}.webp`);
+  const maskTex = load('/images/s06/mask.webp', false);
+  const fionnTex = load('/images/s06/fionn.webp');
+  const finegasTex = load('/images/s06/finegas.webp');
+  const sheepTex = load('/images/s06/sheep.webp');
   tex.wrapS = tex.wrapT = THREE.MirroredRepeatWrapping;
   for (const t of [maskTex, fionnTex, finegasTex, sheepTex]) t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
   // the frame strips are sampled only inside their boxes, where a mipmap would be picked by
@@ -285,7 +284,7 @@ export async function loadScene06() {
   tick(0);
   if (import.meta.env.DEV) window.__scene06 = { uniforms, hold: (v, w = 0) => ((look = -1), (lookT = Infinity), (uniforms.uLook.value = v), (uniforms.uBow.value = w)) };
   return {
-    group,
+    assets, roots: [group], group,
     layout,
     tick,
     setDawn: (d) => (uniforms.uDawn.value = d),

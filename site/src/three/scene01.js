@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { gsap } from 'gsap';
 import { gltfLoader } from './salmon3d.js';
+import { createAssets } from './assets.js';
 
 // Scene 01 as layers in depth: the original painting as the plate, and separately
 // generated foreground pieces (trees A and B, a band of bushes) as inflated meshes.
@@ -29,12 +30,10 @@ export const imageToWorld = (px, py, d) => ({
   y: ((IMG.h / 2 - py) * d) / IMG.w,
 });
 
-export async function loadScene01() {
-  const [gltf, plateTex, nutTex] = await Promise.all([
-    gltfLoader().loadAsync('/3d/s01-layers.glb'),
-    new THREE.TextureLoader().loadAsync('/images/s01-calm-2912.webp'),
-    new THREE.TextureLoader().loadAsync('/images/s02/s02_hazelnut_01.webp'),
-  ]);
+export function createScene01() {
+  const assets = createAssets();
+  const plateTex = assets.texture(`/images/s01-calm-${window.innerWidth < 1000 ? 1600 : 2912}.webp`);
+  const nutTex = assets.texture('/images/s02/s02_hazelnut_01.webp');
   const group = new THREE.Group();
   const materials = []; // [material, base brightness]
 
@@ -64,53 +63,67 @@ export async function loadScene01() {
   group.add(plate);
   materials.push([plateMat, 1]);
 
-  const sources = {};
-  gltf.scene.traverse((o) => {
-    if (!o.isMesh) return;
-    const old = o.material;
-    old.map.colorSpace = THREE.SRGBColorSpace;
-    // unlit, so the colours match the painting
-    const mat = new THREE.MeshBasicMaterial({ map: old.map, alphaTest: 0.5, side: THREE.DoubleSide, transparent: true });
-    old.dispose();
-    o.material = mat;
-    materials.push([mat, LAYER_TINT]);
-    sources[o.name.replace(/\.?\d+$/, '')] = o;
-  });
   const foreground = new THREE.Group();
   const layers = [];
-  for (const [name, x, y, d, scale, mirrored] of PLACES) {
-    const src = sources[name];
-    if (!src) continue;
-    src.geometry.computeBoundingBox();
-    const bb = src.geometry.boundingBox;
-    const h = (bb.max.y - bb.min.y) * scale;
-    // pivot at the base, so trees sway from the ground
-    const pivot = new THREE.Group();
-    const mesh = new THREE.Mesh(src.geometry, src.material);
-    mesh.scale.set(mirrored ? -scale : scale, scale, scale);
-    mesh.position.y = h / 2;
-    pivot.add(mesh);
-    pivot.position.set(x, y - h / 2, -d);
-    foreground.add(pivot);
-    const tree = name.includes('tree');
-    const w = (bb.max.x - bb.min.x) * scale;
-    layers.push({
-      pivot,
-      baseX: x,
-      baseY: pivot.position.y,
-      drop: d * 0.56 * 0.6, // bushes: from below the frame
-      slide: Math.sign(x) * (d * 0.5 - Math.abs(x) + w * 0.6), // trees: from just outside their edge
-      tree,
-      seed: layers.length * 1.7,
-      d,
-      w,
-      h,
+  let order = [];
+  let trees = [];
+  // the foreground pieces, once their file has come in
+  assets.add(async () => {
+    const gltf = await gltfLoader().loadAsync('/3d/s01-layers.glb');
+    const sources = {};
+    gltf.scene.traverse((o) => {
+      if (!o.isMesh) return;
+      const old = o.material;
+      old.map.colorSpace = THREE.SRGBColorSpace;
+      assets.textures.push(old.map);
+      // unlit, so the colours match the painting
+      const mat = new THREE.MeshBasicMaterial({ map: old.map, alphaTest: 0.5, side: THREE.DoubleSide, transparent: true });
+      old.dispose();
+      o.material = mat;
+      materials.push([mat, LAYER_TINT]);
+      sources[o.name.replace(/\.?\d+$/, '')] = o;
     });
-  }
-  // bushes first, then the trees
-  const order = [...layers.filter((l) => !l.tree), ...layers.filter((l) => l.tree)];
+    for (const [name, x, y, d, scale, mirrored] of PLACES) {
+      const src = sources[name];
+      if (!src) continue;
+      src.geometry.computeBoundingBox();
+      const bb = src.geometry.boundingBox;
+      const h = (bb.max.y - bb.min.y) * scale;
+      // pivot at the base, so trees sway from the ground
+      const pivot = new THREE.Group();
+      const mesh = new THREE.Mesh(src.geometry, src.material);
+      mesh.scale.set(mirrored ? -scale : scale, scale, scale);
+      mesh.position.y = h / 2;
+      pivot.add(mesh);
+      pivot.position.set(x, y - h / 2, -d);
+      foreground.add(pivot);
+      const tree = name.includes('tree');
+      const w = (bb.max.x - bb.min.x) * scale;
+      layers.push({
+        pivot,
+        baseX: x,
+        baseY: pivot.position.y,
+        drop: d * 0.56 * 0.6, // bushes: from below the frame
+        slide: Math.sign(x) * (d * 0.5 - Math.abs(x) + w * 0.6), // trees: from just outside their edge
+        tree,
+        seed: layers.length * 1.7,
+        d,
+        w,
+        h,
+      });
+    }
+    // bushes first, then the trees
+    order = [...layers.filter((l) => !l.tree), ...layers.filter((l) => l.tree)];
+    trees = layers.filter((l) => l.tree);
+    // the new materials catch up with wherever the scene has got to
+    setMasked(masked);
+    setBrightness(brightness);
+    setRise(risen);
+  });
   const rise = gsap.parseEase('power3.out'); // settles without overshoot
+  let risen = 0;
   function setRise(r) {
+    risen = r;
     foreground.visible = r > 0;
     order.forEach((l, i) => {
       const a = (i / order.length) * 0.45;
@@ -213,7 +226,6 @@ export async function loadScene01() {
   splash.visible = false;
   group.add(splash);
 
-  const trees = layers.filter((l) => l.tree);
   const POOL = { u: 0.505, v: 0.22, ru: 0.34, rv: 0.125 }; // the rings' ellipse on the plate (v up)
   const plateH = (w * IMG.h) / IMG.w;
   let fall = null; // { t, T, x0, y0, y1, plate: {x, y}, spin }
@@ -270,9 +282,11 @@ export async function loadScene01() {
   };
 
   // seen only through the portal letter until the camera passes the title
-  function setMasked(masked) {
+  let masked = true;
+  function setMasked(on) {
+    masked = on;
     for (const [m] of materials) {
-      m.stencilWrite = masked;
+      m.stencilWrite = on;
       m.stencilRef = 1;
       m.stencilFunc = THREE.EqualStencilFunc;
       m.stencilFail = m.stencilZFail = m.stencilZPass = THREE.KeepStencilOp;
@@ -282,7 +296,9 @@ export async function loadScene01() {
 
   // brightness 0 -> 1: the scene fades up from dark as you scroll towards it. At 0 it is
   // fully transparent, so the counter shows the page behind it like every other letter.
+  let brightness = 0;
   function setBrightness(k) {
+    brightness = k;
     for (const [m, base] of materials) {
       if (base === null) m.uniforms.uBright.value = k;
       else if (m === nutMat) m.color.setScalar(k * base);
@@ -296,5 +312,5 @@ export async function loadScene01() {
   // 1 -> 0: the rings fade as the camera sinks towards the pool (they'd fill the view)
   const setRippleFade = (k) => (ripples.uniforms.uFade.value = k);
   const tick = (dt) => ((ripples.uniforms.uTime.value += dt), sway(dt), nuts(dt));
-  return { group, foreground, setRise, setMasked, setBrightness, setRippleFade, setNuts, tick, pool: imageToWorld(0.505 * IMG.w, 0.78 * IMG.h, PLATE_DEPTH) };
+  return { assets, group, roots: [group, foreground], foreground, setRise, setMasked, setBrightness, setRippleFade, setNuts, tick, pool: imageToWorld(0.505 * IMG.w, 0.78 * IMG.h, PLATE_DEPTH) };
 }

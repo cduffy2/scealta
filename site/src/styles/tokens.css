@@ -1,6 +1,6 @@
 /* Insular Modern palette, Gaillimh + BioRhyme type system (Figma: Style guide page). */
 
-/* Five static weights. The title animation steps through them like a weight axis. */
+/* The static weights in use. The title animation steps through them like a weight axis. */
 @font-face {
   font-family: 'Gaillimh';
   src: url('/fonts/gaillimh-thin.woff2') format('woff2');
@@ -11,18 +11,6 @@
   font-family: 'Gaillimh';
   src: url('/fonts/gaillimh-light.woff2') format('woff2');
   font-weight: 300;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Gaillimh';
-  src: url('/fonts/gaillimh-bold.woff2') format('woff2');
-  font-weight: 700;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Gaillimh';
-  src: url('/fonts/gaillimh-black.woff2') format('woff2');
-  font-weight: 900;
   font-display: swap;
 }
 @font-face {
