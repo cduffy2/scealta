@@ -22,7 +22,10 @@ const DEEP = new THREE.Color('#040c07');
 const WATER = [BG.clone(), DEEP.clone()];
 const RIVER = [new THREE.Color('#0b3006'), new THREE.Color('#031a03')];
 const SHAFT = new THREE.Color('#d6e8a8'); // light falling from the surface
-const DEPTH = { particles: 13, leaves: 3.2, nuts: [5.5, 9] };
+// the small nuts lie past the salmon, clear of even his tail at full beat, so he passes in
+// front of them; the large ones stay in the foreground
+const DEPTH = { particles: 13, leaves: 3.2, nuts: [5.5, 9], farNuts: [13.5, 15] };
+const SMALL_NUT = 90; // frame px wide
 // the painted salmon: head tip and vertical extent in the frame (from s02_salmon.png, doubled)
 const FISH = { tipX: 754, top: 250, bottom: 1270, depth: 10 };
 
@@ -95,7 +98,8 @@ export function createScene02() {
 
   // hazelnuts, nearer ones larger; each drifts and turns a little on its own
   const nuts = manifest.nuts.map((n, i) => {
-    const d = THREE.MathUtils.lerp(DEPTH.nuts[0], DEPTH.nuts[1], (i * 0.618) % 1);
+    const [near, far] = n.w < SMALL_NUT ? DEPTH.farNuts : DEPTH.nuts;
+    const d = THREE.MathUtils.lerp(near, far, (i * 0.618) % 1);
     const mesh = sprite(n.name, (n.w * d) / FW, (n.h * d) / FW);
     const c = toWorld(n.cx, n.cy, d);
     mesh.position.set(c.x, c.y, -d);
