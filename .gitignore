@@ -1,6 +1,7 @@
 .DS_Store
 node_modules/
 site/dist/
+site/.lighthouseci/
 *.blend1
 
 # test renders and previews, regenerated from Blender

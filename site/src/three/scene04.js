@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import meta from './s04-catch.json';
 import { ribbon as markRibbon, ringMaterial } from './marks.js';
+import { createAssets } from './assets.js';
 
 // Scene 04, the catch: the salmon hooked on Finegas's line, straining up out of the water at
 // night. The painting is a plate with the salmon, the line and the drops of water around him
@@ -51,19 +52,17 @@ const glow = (falloff = 2.2) =>
   });
 const leftEdge = (y) => lerp(2120, 2214, THREE.MathUtils.clamp((y - 820) / 420, 0, 1));
 
-export async function loadScene04() {
-  const loader = new THREE.TextureLoader();
-  const load = async (url) => {
-    const t = await loader.loadAsync(url);
+export function createScene04() {
+  const assets = createAssets();
+  const load = (url) => {
+    const t = assets.texture(url);
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 4;
     return t;
   };
-  const [plateTex, fishTex, ...dropTex] = await Promise.all([
-    load(`/images/s04-plate-${window.innerWidth < 1000 ? 1600 : 2912}.webp`),
-    load('/images/s04/salmon.webp'),
-    ...meta.drops.map((d) => load(`/images/s04/${d.name.slice(4)}.webp`)),
-  ]);
+  const plateTex = load(`/images/s04-plate-${window.innerWidth < 1000 ? 1600 : 2912}.webp`);
+  const fishTex = load('/images/s04/salmon.webp');
+  const dropTex = meta.drops.map((d) => load(`/images/s04/${d.name.slice(4)}.webp`));
 
   const group = new THREE.Group();
   const art = new THREE.Group(); // the painting's frame: D wide, centred; moved for portrait
@@ -382,7 +381,7 @@ export async function loadScene04() {
 
   tick(0);
   return {
-    group,
+    assets, roots: [group], group,
     layout,
     tick,
     setReveal,

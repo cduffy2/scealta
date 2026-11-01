@@ -215,8 +215,11 @@
   width: calc(var(--fill, 0) * 100%);
   background: var(--glow);
 }
-/* in 3D mode the scene text lives on the splash and the flat scenes are not needed */
-.is-3d .scene {
+/* in 3D mode the scene text lives on the splash and the flat scenes are not needed.
+   flat-off is set in index.html, before the images are parsed, so theirs never download */
+.is-3d .scene,
+.flat-off .scene,
+.flat-off .portal {
   display: none;
 }
 .splash > .scene__scrim,

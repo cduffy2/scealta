@@ -86,14 +86,17 @@ export function showTitle(el, chars) {
   gsap.set(chars, { clearProps: 'all' });
 }
 
-// The counter (enclosed hole) of the portal letter, measured from the real glyph:
-// draw it on a canvas, flood the outside, and what's left unfilled inside is the hole.
-// Returns centre and radii in px, relative to `frame`.
-export function measureCounter(letter, frame) {
-  const cs = getComputedStyle(letter);
-  const size = parseFloat(cs.fontSize);
-  const k = 4; // supersample
-  const ch = letter.firstChild.textContent;
+const k = 4; // supersample
+const scans = new Map(); // the page re-measures often, but a glyph's counter only changes with its size
+
+// The counter's box in the glyph, supersampled: the unreached pixels of a flood fill from outside.
+function scanCounter(ch, size) {
+  const key = `${ch} ${size}`;
+  if (!scans.has(key)) scans.set(key, floodCounter(ch, size));
+  return scans.get(key);
+}
+
+function floodCounter(ch, size) {
   const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
   ctx.font = `300 ${size * k}px Gaillimh`;
   const m = ctx.measureText(ch);
@@ -112,16 +115,19 @@ export function measureCounter(letter, frame) {
   const outside = new Uint8Array(w * h);
   const stack = [0];
   outside[0] = 1;
+  const visit = (j) => {
+    if (!outside[j] && !ink(j)) {
+      outside[j] = 1;
+      stack.push(j);
+    }
+  };
   while (stack.length) {
     const i = stack.pop();
     const x = i % w;
-    const y = (i / w) | 0;
-    for (const j of [x > 0 && i - 1, x < w - 1 && i + 1, y > 0 && i - w, y < h - 1 && i + w]) {
-      if (j !== false && !outside[j] && !ink(j)) {
-        outside[j] = 1;
-        stack.push(j);
-      }
-    }
+    if (x > 0) visit(i - 1);
+    if (x < w - 1) visit(i + 1);
+    if (i >= w) visit(i - w);
+    if (i < w * (h - 1)) visit(i + w);
   }
   let x0 = w, y0 = h, x1 = 0, y1 = 0;
   for (let i = 0; i < w * h; i++) {
@@ -134,6 +140,17 @@ export function measureCounter(letter, frame) {
     }
   }
   if (x1 <= x0) return null; // letter has no counter
+  return { x0, y0, x1, y1, ox, oy, advance: m.width };
+}
+
+// The counter (enclosed hole) of the portal letter, measured from the real glyph:
+// draw it on a canvas, flood the outside, and what's left unfilled inside is the hole.
+// Returns centre and radii in px, relative to `frame`.
+export function measureCounter(letter, frame) {
+  const size = parseFloat(getComputedStyle(letter).fontSize);
+  const scan = scanCounter(letter.firstChild.textContent, size);
+  if (!scan) return null;
+  const { x0, y0, x1, y1, ox, oy, advance } = scan;
 
   const box = letter.getBoundingClientRect();
   const fr = frame.getBoundingClientRect();
@@ -141,7 +158,7 @@ export function measureCounter(letter, frame) {
   // locked: the glyph is centred in a fixed-width box. Released: it starts at the box's
   // left edge (kerning only changes the advance, which must not shift the origin).
   const locked = letter.closest('.title--locked');
-  const originX = locked ? box.left + (box.width - m.width / k) / 2 : box.left;
+  const originX = locked ? box.left + (box.width - advance / k) / 2 : box.left;
   return {
     x: originX + ((x0 + x1) / 2 - ox) / k - fr.left,
     y: baseline + ((y0 + y1) / 2 - oy) / k - fr.top,

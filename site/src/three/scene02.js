@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { gsap } from 'gsap';
 import manifest from './s02-layers.json';
+import { createAssets } from './assets.js';
 
 // Scene 02, under the pool: the painting rebuilt as layers in depth, so the camera can
 // arrive into it after diving through scene 01's water. The salmon itself is the 3D one
@@ -27,12 +28,16 @@ const FISH = { tipX: 754, top: 250, bottom: 1270, depth: 10 };
 
 const toWorld = (px, py, d) => ({ x: ((px - FW / 2) * d) / FW, y: ((FH / 2 - py) * d) / FW });
 
-export async function loadScene02() {
-  const loader = new THREE.TextureLoader();
-  const load = (name) =>
-    loader.loadAsync(`/images/s02/${name}.webp`).then((t) => ((t.colorSpace = THREE.SRGBColorSpace), (t.anisotropy = 4), t));
+export function createScene02() {
+  const assets = createAssets();
+  const load = (name) => {
+    const t = assets.texture(`/images/s02/${name}.webp`);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    return t;
+  };
   const names = [...Object.keys(manifest.layers), ...manifest.nuts.map((n) => n.name)];
-  const tex = Object.fromEntries(await Promise.all(names.map(async (n) => [n, await load(n)])));
+  const tex = Object.fromEntries(names.map((n) => [n, load(n)]));
 
   const group = new THREE.Group();
   const materials = [];
@@ -175,5 +180,5 @@ export async function loadScene02() {
 
   setArrive(0);
   setBrightness(0);
-  return { group, front, layout, setArrive, setBrightness, setRiver, tick, fishPose };
+  return { assets, group, roots: [group, front], front, layout, setArrive, setBrightness, setRiver, tick, fishPose };
 }

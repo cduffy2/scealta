@@ -41,3 +41,12 @@ npm run build      # production build in site/dist
 Retold, designed and developed by Ciarán Duffy. Illustrations generated with Midjourney,
 art-directed by Ciarán Duffy. Type: Gaillimh by Unthink for Galway 2020, BioRhyme by Aoife
 Mooney.
+
+## Performance
+
+The site is held to a budget: `npm run check:budget` after a build, and Lighthouse on every pull request (`.github/workflows/performance.yml`).
+
+- Only the title and the salmon may hold up the opening. Everything else loads in a stage, after the first frame or after the reader first acts (`src/three/splash3d.js`).
+- A new scene's images go through `createAssets()` (`src/three/assets.js`), and the scene stays hidden until they're all in. No `await` on assets in a scene.
+- Paintings load at 1600 under 1000px wide, 2912 above.
+- A browser with no usable GPU gets the flat version. `/?3d=force` runs the 3D there, for testing.
