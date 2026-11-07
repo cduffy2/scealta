@@ -83,6 +83,10 @@ const ARRIVALS = [
   arrival(PULL6[0], TEXT6_IN),
 ];
 const LET_GO = 0.1; // how far back before an arrival undoes itself, so a nudge back doesn't
+// The Listen / Read buttons glide down to scene 01 rather than jump, so the fly-through the
+// title can be watched: this long, in seconds, slow to start and slow to land.
+const GUIDE_DURATION = 6;
+const GUIDE_EASE = 'power2.inOut';
 const SNAP = 5; // how quickly the scene closes on the scroll (per second; about 0.6s to land)
 // shares of the way back: everything but the salmon fades from around him, scene 06 comes
 // up out of the dark behind him (slowly, so Finegas and Fionn don't appear at once), the
@@ -485,12 +489,30 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
   }
   let lastFade = 1;
 
+  // ---- the buttons' glide ----------------------------------------------------
+  const TAKE_OVER = ['wheel', 'touchstart', 'keydown'];
+  let guide = null; // the glide down to scene 01, while it runs
+  function stopGuide() {
+    if (!guide) return;
+    guide.kill();
+    guide = null;
+    for (const e of TAKE_OVER) window.removeEventListener(e, stopGuide);
+  }
+
   // ---- arrivals --------------------------------------------------------------
   let want = 0; // where the scene should be, in screen heights
   let arriving = null; // the arrival the scroll is inside
   let catching = false; // the scene is closing on `want` by itself, each frame
   function follow(pin) {
     const u = pin * TOTAL;
+    // the glide sets its own pace, so no arrival hurries it along
+    if (guide) {
+      arriving = null;
+      catching = false;
+      want = u;
+      setProgress(u / TOTAL);
+      return;
+    }
     const was = arriving;
     if (arriving && (u >= arriving[1] || u < arriving[0] - LET_GO)) arriving = null;
     arriving ??= ARRIVALS.find(([from, to]) => u >= from && u < to) ?? null;
@@ -658,10 +680,23 @@ export async function createSplash3D({ splash, host, titleEl, getTitle, salmonEl
     // jump to where scene 01 is fully in (the Listen / Read buttons)
     goToScene(behavior = 'smooth') {
       if (!trigger) return;
-      window.scrollTo({ top: trigger.start + (trigger.end - trigger.start) * ((LANDED * S1) / TOTAL), behavior });
+      const top = trigger.start + (trigger.end - trigger.start) * ((LANDED * S1) / TOTAL);
+      stopGuide();
+      if (behavior !== 'smooth') return window.scrollTo({ top, behavior });
+      const pos = { y: window.scrollY };
+      guide = gsap.to(pos, {
+        y: top,
+        duration: GUIDE_DURATION,
+        ease: GUIDE_EASE,
+        onUpdate: () => window.scrollTo(0, pos.y),
+        onComplete: stopGuide,
+      });
+      // the reader takes over the moment they scroll themselves
+      for (const e of TAKE_OVER) window.addEventListener(e, stopGuide, { passive: true });
     },
     destroy() {
       destroyed = true;
+      stopGuide();
       for (const e of WAKE) window.removeEventListener(e, wake);
       trigger?.kill(true);
       trigger = null;

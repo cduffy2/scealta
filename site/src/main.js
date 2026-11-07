@@ -178,8 +178,22 @@ for (const b of document.querySelectorAll('[data-choose]')) {
     save();
     if (splash3d) return splash3d.goToScene(state.motion === 'off' ? 'auto' : 'smooth');
     const target = document.getElementById('scene-01');
-    target.scrollIntoView({ behavior: state.motion === 'off' ? 'auto' : 'smooth' });
     target.focus({ preventScroll: true });
+    if (state.motion === 'off') return target.scrollIntoView({ behavior: 'auto' });
+    // a slow glide through the 2D zoom, as in 3D; the reader's own scroll takes over
+    const pos = { y: window.scrollY };
+    const glide = gsap.to(pos, {
+      y: target.getBoundingClientRect().top + window.scrollY,
+      duration: 6,
+      ease: 'power2.inOut',
+      onUpdate: () => window.scrollTo(0, pos.y),
+    });
+    const stop = () => {
+      glide.kill();
+      for (const e of ['wheel', 'touchstart', 'keydown']) window.removeEventListener(e, stop);
+    };
+    for (const e of ['wheel', 'touchstart', 'keydown']) window.addEventListener(e, stop, { passive: true });
+    glide.eventCallback('onComplete', stop);
   });
 }
 
